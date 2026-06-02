@@ -299,6 +299,25 @@ async function run() {
     assert(dashboard.response.status === 200, "admin dashboard should load after edge operations");
     assert(dashboard.body.transactions.some((tx) => tx.userName === user.displayName && tx.type === "admin_adjustment"), "dashboard should expose admin adjustment transactions");
 
+    const generatedInvites = await admin("/api/admin/invites", {
+      method: "POST",
+      body: JSON.stringify({ count: 2, note: "edge batch note" }),
+    });
+    assert(generatedInvites.response.status === 200, "invite generation with note should succeed");
+    assert(generatedInvites.body.codes.every((code) => /^[A-Z]{6}$/.test(code)), "generated invite codes should be six letters");
+    db = readDb();
+    const generatedInvite = db.inviteCodes.find((invite) => invite.code === generatedInvites.body.codes[0]);
+    assert(generatedInvite, "generated invite should exist in db");
+    assert(generatedInvite.note === "edge batch note", "generated invites should store batch note");
+
+    const noteUpdate = await admin("/api/admin/invites", {
+      method: "PATCH",
+      body: JSON.stringify({ id: generatedInvite.id, note: "edge private owner" }),
+    });
+    assert(noteUpdate.response.status === 200, "invite note update should succeed");
+    db = readDb();
+    assert(db.inviteCodes.find((invite) => invite.id === generatedInvite.id).note === "edge private owner", "invite note should update");
+
     const unauthExport = await request("/api/admin/export?type=players", {
       headers: { "x-admin-password": "wrong" },
     });
@@ -321,6 +340,14 @@ async function run() {
       body: JSON.stringify(restoreJson),
     });
     assert(importDb.response.status === 200, "admin db import should succeed");
+
+    const resetInitial = await admin("/api/admin/db/reset", { method: "POST" });
+    assert(resetInitial.response.status === 200, "admin initial reset should succeed");
+    db = readDb();
+    assert(db.users.length === 0, "initial reset should clear users");
+    assert(db.inviteCodes.length === 0, "initial reset should clear invite codes");
+    assert(db.bets.length === 0, "initial reset should clear bets");
+    assert(db.walletTransactions.length === 0, "initial reset should clear wallet transactions");
 
     const autoBackups = fs.existsSync(autoBackupDir) ? fs.readdirSync(autoBackupDir).filter((file) => file.endsWith(".json")) : [];
     assert(autoBackups.length > 0, "automatic db backups should be created during writes");
@@ -347,9 +374,12 @@ async function run() {
         "settled bet cancel rejected",
         "AI multi-turn player analysis",
         "dashboard transaction audit",
+        "invite batch note",
+        "invite note update",
         "admin exports",
         "admin reset balances",
         "admin db import",
+        "admin initial reset",
         "automatic db backups",
       ],
     };

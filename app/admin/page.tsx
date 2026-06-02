@@ -6,7 +6,7 @@ import { Ban, Coins, Download, RefreshCw, Search, TicketPlus, Trash2 } from "luc
 type UserRow = { id: string; displayName: string; balance: number; inviteCode: string; lastLoginAt: string; totalBets: number; pendingBets: number; totalStake: number; netProfit: number };
 type BetRow = { id: string; orderNo: string; userName: string; matchTitle: string; score: string; selectionLabel: string; price: number; stake: number; status: string; profit: number; createdAt: string };
 type TransactionRow = { id: string; userName: string; orderNo: string; amount: number; balance: number; type: string; note?: string; betLabel?: string; createdAt: string };
-type InviteRow = { id: string; code: string; status: string; createdAt: string; usedAt?: string; user?: { displayName: string; balance: number } | null };
+type InviteRow = { id: string; code: string; status: string; note?: string; createdAt: string; usedAt?: string; user?: { displayName: string; balance: number } | null };
 type OutrightRow = { id: string; teamName: string; flag?: string; price: number; bookmaker: string; fetchedAt: string; pendingBets: number };
 type MatchRow = { id: string; homeTeamZh: string; awayTeamZh: string; commenceTime: string; status: string; homeScore?: number; awayScore?: number; pendingBets: number; totalBets: number; groupName?: string };
 type ActiveTab = "players" | "bets" | "settlements" | "invites" | "outrights" | "results";
@@ -40,6 +40,7 @@ export default function AdminPage() {
   const [adjustUserId, setAdjustUserId] = useState("");
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustNote, setAdjustNote] = useState("");
+  const [inviteNote, setInviteNote] = useState("");
   const [outrightId, setOutrightId] = useState("");
   const [outrightTeam, setOutrightTeam] = useState("");
   const [outrightFlag, setOutrightFlag] = useState("");
@@ -84,8 +85,9 @@ export default function AdminPage() {
   async function generateInvites() {
     setLoading(true);
     try {
-      const data = await request("/api/admin/invites", { method: "POST", body: JSON.stringify({ count: 100 }) });
+      const data = await request("/api/admin/invites", { method: "POST", body: JSON.stringify({ count: 100, note: inviteNote }) });
       setMessage(`已生成 ${data.codes.length} 个邀请码`);
+      setInviteNote("");
       await loadDashboard();
       setActive("invites");
     } catch (error) {
@@ -135,6 +137,36 @@ export default function AdminPage() {
       setActive("settlements");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "重置失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resetInitialState() {
+    const confirmed = window.confirm("确定恢复到初始状态吗？这会删除所有玩家、邀请码、下注记录和资金流水，并清空已填赛果。当前数据会先自动备份。");
+    if (!confirmed) return;
+    setLoading(true);
+    try {
+      const data = await request("/api/admin/db/reset", { method: "POST" });
+      setMessage(`已恢复初始状态：清除 ${data.cleared.users} 个玩家、${data.cleared.invites} 个邀请码、${data.cleared.bets} 个订单`);
+      await loadDashboard();
+      setActive("players");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "恢复初始状态失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveInviteNote(id: string, note: string) {
+    setLoading(true);
+    try {
+      await request("/api/admin/invites", { method: "PATCH", body: JSON.stringify({ id, note }) });
+      setMessage("邀请码备注已保存");
+      await loadDashboard();
+      setActive("invites");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "保存备注失败");
     } finally {
       setLoading(false);
     }
@@ -316,6 +348,7 @@ export default function AdminPage() {
           <section className="admin-actions">
             <button className="button secondary" onClick={loadDashboard} disabled={loading}><RefreshCw size={16} /> 刷新数据</button>
             <button className="button secondary" onClick={refreshOdds} disabled={loading}><RefreshCw size={16} /> 刷新赔率/赛程</button>
+            <input className="input" value={inviteNote} onChange={(event) => setInviteNote(event.target.value)} placeholder="本批邀请码备注，可选" />
             <button className="button secondary" onClick={generateInvites} disabled={loading}><TicketPlus size={16} /> 生成100个邀请码</button>
             <button className="button secondary" onClick={() => exportData("players")} disabled={loading}><Download size={16} /> 导出玩家汇总</button>
             <button className="button secondary" onClick={() => exportData("bets")} disabled={loading}><Download size={16} /> 导出下注明细</button>
@@ -339,6 +372,7 @@ export default function AdminPage() {
               <button className="button" onClick={adjustBalance} disabled={loading}><Coins size={16} /> 确认调整</button>
             </div>
             <button className="button secondary admin-reset-button" onClick={resetAllBalances} disabled={loading}>一键恢复所有人到3000分</button>
+            <button className="button secondary admin-danger-reset-button" onClick={resetInitialState} disabled={loading}>一键恢复到初始状态</button>
           </section>
 
           <section className="admin-panel wide">
@@ -366,7 +400,7 @@ export default function AdminPage() {
             {active === "bets" ? <BetsTable bets={filteredBets} onCancel={cancelBet} /> : null}
             {active === "settlements" ? <TransactionsTable transactions={filteredTransactions} /> : null}
             {active === "results" ? <ResultsPanel matches={dashboard.matches} matchId={resultMatchId} setMatchId={setResultMatchId} homeScore={homeScore} setHomeScore={setHomeScore} awayScore={awayScore} setAwayScore={setAwayScore} onSave={updateMatchResult} /> : null}
-            {active === "invites" ? <InvitesTable invites={dashboard.invites} /> : null}
+            {active === "invites" ? <InvitesTable invites={dashboard.invites} onSaveNote={saveInviteNote} /> : null}
             {active === "outrights" ? (
               <OutrightsPanel
                 outrights={dashboard.outrights}
@@ -454,8 +488,24 @@ function ResultsPanel(props: {
   );
 }
 
-function InvitesTable({ invites }: { invites: InviteRow[] }) {
-  return <Table headers={["邀请码", "状态", "玩家", "余额", "创建时间", "使用时间"]}>{invites.map((i) => <tr key={i.id}><td><strong>{i.code}</strong></td><td>{i.status === "used" ? "已使用" : i.status === "disabled" ? "已停用" : "未使用"}</td><td>{i.user?.displayName || "-"}</td><td>{i.user ? formatPoints(i.user.balance) : "-"}</td><td>{formatTime(i.createdAt)}</td><td>{formatTime(i.usedAt)}</td></tr>)}</Table>;
+function InvitesTable({ invites, onSaveNote }: { invites: InviteRow[]; onSaveNote: (id: string, note: string) => void }) {
+  return <Table headers={["邀请码", "备注", "状态", "玩家", "余额", "创建时间", "使用时间", "操作"]}>{invites.map((i) => <InviteRowItem invite={i} onSaveNote={onSaveNote} key={i.id} />)}</Table>;
+}
+
+function InviteRowItem({ invite, onSaveNote }: { invite: InviteRow; onSaveNote: (id: string, note: string) => void }) {
+  const [note, setNote] = useState(invite.note || "");
+  return (
+    <tr>
+      <td><strong>{invite.code}</strong></td>
+      <td><input className="input invite-note-input" value={note} onChange={(event) => setNote(event.target.value)} placeholder="只在后台可见" /></td>
+      <td>{invite.status === "used" ? "已使用" : invite.status === "disabled" ? "已停用" : "未使用"}</td>
+      <td>{invite.user?.displayName || "-"}</td>
+      <td>{invite.user ? formatPoints(invite.user.balance) : "-"}</td>
+      <td>{formatTime(invite.createdAt)}</td>
+      <td>{formatTime(invite.usedAt)}</td>
+      <td><button className="mini-button" onClick={() => onSaveNote(invite.id, note)}>保存备注</button></td>
+    </tr>
+  );
 }
 
 function OutrightsPanel(props: {

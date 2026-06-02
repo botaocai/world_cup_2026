@@ -15,6 +15,7 @@ export type InviteCode = {
   id: string;
   code: string;
   status: "unused" | "used" | "disabled";
+  note?: string;
   createdAt: string;
   usedAt?: string;
 };

@@ -11,7 +11,7 @@ export function createInviteCode() {
   return code;
 }
 
-export async function generateInviteCodes(count = 100) {
+export async function generateInviteCodes(count = 100, note = "") {
   const db = readDb();
   const created: string[] = [];
 
@@ -22,6 +22,7 @@ export async function generateInviteCodes(count = 100) {
         id: createId(),
         code,
         status: "unused",
+        note: note.trim() || undefined,
         createdAt: timestamp(),
       });
       created.push(code);

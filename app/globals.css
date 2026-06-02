@@ -1128,6 +1128,21 @@ a {
   margin-top: 10px;
 }
 
+.admin-danger-reset-button {
+  width: auto;
+  padding: 0 16px;
+  margin-top: 10px;
+  margin-left: 10px;
+  border-color: #f0c9c5;
+  background: #f8e5e2;
+  color: var(--red);
+}
+
+.invite-note-input {
+  min-width: 180px;
+  height: 34px;
+}
+
 @media (max-width: 820px) {
   .admin-shell {
     padding: 14px;
