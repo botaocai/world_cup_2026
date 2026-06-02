@@ -4,5 +4,6 @@ node_modules
 .env.local
 worldcup.db
 data/db.json
+data/backups
 *.log
 oddsapi_*.json

@@ -103,6 +103,8 @@ export type Db = {
 
 const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const dbPath = path.join(dataDir, "db.json");
+const backupDir = path.join(dataDir, "backups");
+const maxBackups = Number(process.env.DB_MAX_BACKUPS || 50);
 
 function id() {
   return crypto.randomUUID();
@@ -216,7 +218,29 @@ export function readDb(): Db {
 
 export function writeDb(db: Db) {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  if (fs.existsSync(dbPath)) {
+    fs.mkdirSync(backupDir, { recursive: true });
+    const backupName = `db-${now().replace(/[:.]/g, "-")}.json`;
+    fs.copyFileSync(dbPath, path.join(backupDir, backupName));
+    pruneBackups();
+  }
   fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
+}
+
+function pruneBackups() {
+  if (!fs.existsSync(backupDir) || !Number.isFinite(maxBackups) || maxBackups <= 0) return;
+  const backups = fs
+    .readdirSync(backupDir)
+    .filter((file) => file.endsWith(".json"))
+    .map((file) => ({
+      file,
+      mtime: fs.statSync(path.join(backupDir, file)).mtimeMs,
+    }))
+    .sort((a, b) => b.mtime - a.mtime);
+
+  for (const backup of backups.slice(maxBackups)) {
+    fs.rmSync(path.join(backupDir, backup.file), { force: true });
+  }
 }
 
 export function createId() {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, Coins, RefreshCw, Search, TicketPlus, Trash2 } from "lucide-react";
+import { Ban, Coins, Download, RefreshCw, Search, TicketPlus, Trash2 } from "lucide-react";
 
 type UserRow = { id: string; displayName: string; balance: number; inviteCode: string; lastLoginAt: string; totalBets: number; pendingBets: number; totalStake: number; netProfit: number };
 type BetRow = { id: string; orderNo: string; userName: string; matchTitle: string; score: string; selectionLabel: string; price: number; stake: number; status: string; profit: number; createdAt: string };
@@ -185,6 +185,34 @@ export default function AdminPage() {
     }
   }
 
+  async function exportData(type: "players" | "bets" | "transactions" | "json") {
+    if (!password) return setMessage("请先输入管理员密码");
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/admin/export?type=${type}`, {
+        headers: { "x-admin-password": password },
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "导出失败");
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") || "";
+      const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `worldcup-${type}.csv`;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      window.URL.revokeObjectURL(url);
+      setMessage("导出完成");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "导出失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const filteredBets = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!dashboard || !needle) return dashboard?.bets || [];
@@ -227,6 +255,10 @@ export default function AdminPage() {
             <button className="button secondary" onClick={loadDashboard} disabled={loading}><RefreshCw size={16} /> 刷新数据</button>
             <button className="button secondary" onClick={refreshOdds} disabled={loading}><RefreshCw size={16} /> 刷新赔率</button>
             <button className="button secondary" onClick={generateInvites} disabled={loading}><TicketPlus size={16} /> 生成100个邀请码</button>
+            <button className="button secondary" onClick={() => exportData("players")} disabled={loading}><Download size={16} /> 导出玩家汇总</button>
+            <button className="button secondary" onClick={() => exportData("bets")} disabled={loading}><Download size={16} /> 导出下注明细</button>
+            <button className="button secondary" onClick={() => exportData("transactions")} disabled={loading}><Download size={16} /> 导出资金流水</button>
+            <button className="button secondary" onClick={() => exportData("json")} disabled={loading}><Download size={16} /> 导出完整数据</button>
           </section>
 
           <section className="admin-panel wide">

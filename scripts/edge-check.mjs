@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 const baseUrl = process.env.E2E_BASE_URL || "http://localhost:3000";
 const dbPath = path.join(process.cwd(), "data", "db.json");
 const backupPath = path.join(process.cwd(), "data", "db.edge-backup.json");
+const autoBackupDir = path.join(process.cwd(), "data", "backups");
 const adminPassword = process.env.ADMIN_PASSWORD || readEnv("ADMIN_PASSWORD") || "admin";
 
 function readEnv(key) {
@@ -272,6 +273,20 @@ async function run() {
     assert(dashboard.response.status === 200, "admin dashboard should load after edge operations");
     assert(dashboard.body.transactions.some((tx) => tx.userName === user.displayName && tx.type === "admin_adjustment"), "dashboard should expose admin adjustment transactions");
 
+    const unauthExport = await request("/api/admin/export?type=players", {
+      headers: { "x-admin-password": "wrong" },
+    });
+    assert(unauthExport.response.status === 401, "exports should reject wrong admin password");
+
+    for (const type of ["players", "bets", "transactions", "json"]) {
+      const exported = await admin(`/api/admin/export?type=${type}`);
+      assert(exported.response.status === 200, `${type} export should succeed`);
+      assert(String(exported.body.raw || JSON.stringify(exported.body)).length > 20, `${type} export should return data`);
+    }
+
+    const autoBackups = fs.existsSync(autoBackupDir) ? fs.readdirSync(autoBackupDir).filter((file) => file.endsWith(".json")) : [];
+    assert(autoBackups.length > 0, "automatic db backups should be created during writes");
+
     return {
       ok: true,
       checks: [
@@ -291,6 +306,8 @@ async function run() {
         "settled bet cancel rejected",
         "AI multi-turn player analysis",
         "dashboard transaction audit",
+        "admin exports",
+        "automatic db backups",
       ],
     };
   } finally {
