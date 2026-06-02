@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+function normalizeInviteCode(value: string) {
+  return value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10);
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [code, setCode] = useState("");
@@ -21,7 +25,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const normalizedCode = code.trim().toUpperCase();
+    const normalizedCode = normalizeInviteCode(code);
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -55,8 +59,12 @@ export default function LoginPage() {
         <input
           className="input"
           value={code}
-          onChange={(event) => setCode(event.target.value.toUpperCase())}
+          onChange={(event) => setCode(event.target.value)}
+          onBlur={() => setCode((value) => normalizeInviteCode(value))}
           placeholder="输入邀请码"
+          autoCapitalize="characters"
+          autoComplete="one-time-code"
+          maxLength={12}
           autoFocus
         />
         {needsDisplayName ? (
@@ -71,7 +79,7 @@ export default function LoginPage() {
           </>
         ) : null}
         <div style={{ height: 12 }} />
-        <button className="button" disabled={loading || !code.trim()}>
+        <button className="button" disabled={loading || !normalizeInviteCode(code)}>
           {loading ? "登录中..." : needsDisplayName ? "创建账号" : "进入竞猜"}
         </button>
         {error ? <div className="error">{error}</div> : null}
