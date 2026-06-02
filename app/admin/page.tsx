@@ -21,7 +21,7 @@ type Dashboard = {
 };
 
 const statusText: Record<string, string> = { pending: "待结算", won: "已赢", lost: "已输", void: "已退回" };
-const txText: Record<string, string> = { initial_grant: "初始积分", bet_stake: "下注扣款", bet_settlement: "派奖结算", admin_adjustment: "后台调整", admin_cancel_bet: "取消退回", outright_settlement: "冠军结算" };
+const txText: Record<string, string> = { initial_grant: "初始积分", bet_stake: "下注扣款", bet_settlement: "派奖结算", admin_adjustment: "后台调整", admin_cancel_bet: "取消退回", outright_settlement: "冠军结算", admin_reset_balance: "余额重置" };
 
 function formatPoints(value: number) {
   return new Intl.NumberFormat("zh-CN").format(value);
@@ -125,6 +125,41 @@ export default function AdminPage() {
     }
   }
 
+  async function resetAllBalances() {
+    if (!window.confirm("确定把所有玩家当前余额重置为 3000 分吗？下注记录不会删除。")) return;
+    setLoading(true);
+    try {
+      const data = await request("/api/admin/balances/reset", { method: "POST" });
+      setMessage(`已恢复 ${data.changed.length} 个玩家到 ${data.target} 分`);
+      await loadDashboard();
+      setActive("settlements");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "重置失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function importDatabase(file?: File | null) {
+    if (!file) return;
+    if (!window.confirm("确定用这个 JSON 覆盖线上数据库吗？当前线上数据会先自动备份。")) return;
+    setLoading(true);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const data = await request("/api/admin/db/import", {
+        method: "POST",
+        body: JSON.stringify(parsed),
+      });
+      setMessage(`数据库已恢复：${data.users} 个玩家，${data.bets} 个订单，${data.matches} 场比赛`);
+      await loadDashboard();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "导入失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function updateMatchResult() {
     if (!resultMatchId || homeScore === "" || awayScore === "") return setMessage("请选择比赛并填写比分");
     setLoading(true);
@@ -133,7 +168,8 @@ export default function AdminPage() {
         method: "POST",
         body: JSON.stringify({ matchId: resultMatchId, homeScore: Number(homeScore), awayScore: Number(awayScore) }),
       });
-      setMessage(`赛果已更新，并结算 ${data.settled.length} 单`);
+      const marketText = data.markets ? Object.entries(data.markets).map(([market, count]) => `${market}:${count}`).join("，") : "";
+      setMessage(`赛果已更新，并结算 ${data.settled.length} 单${marketText ? `（${marketText}）` : ""}`);
       setHomeScore("");
       setAwayScore("");
       await loadDashboard();
@@ -285,6 +321,10 @@ export default function AdminPage() {
             <button className="button secondary" onClick={() => exportData("bets")} disabled={loading}><Download size={16} /> 导出下注明细</button>
             <button className="button secondary" onClick={() => exportData("transactions")} disabled={loading}><Download size={16} /> 导出资金流水</button>
             <button className="button secondary" onClick={() => exportData("json")} disabled={loading}><Download size={16} /> 导出完整数据</button>
+            <label className={`button secondary admin-upload ${loading ? "disabled" : ""}`}>
+              <Download size={16} /> 导入完整数据
+              <input type="file" accept="application/json,.json" disabled={loading} onChange={(event) => importDatabase(event.target.files?.[0])} />
+            </label>
           </section>
 
           <section className="admin-panel wide">
@@ -298,6 +338,7 @@ export default function AdminPage() {
               <input className="input" value={adjustNote} onChange={(event) => setAdjustNote(event.target.value)} placeholder="备注，可选" />
               <button className="button" onClick={adjustBalance} disabled={loading}><Coins size={16} /> 确认调整</button>
             </div>
+            <button className="button secondary admin-reset-button" onClick={resetAllBalances} disabled={loading}>一键恢复所有人到3000分</button>
           </section>
 
           <section className="admin-panel wide">

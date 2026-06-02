@@ -975,12 +975,30 @@ a {
 }
 
 .admin-actions .button,
+.admin-actions .admin-upload,
 .admin-form-grid .button,
 .button.secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+}
+
+.admin-upload {
+  position: relative;
+  min-height: 42px;
+}
+
+.admin-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: auto;
+}
+
+.admin-upload.disabled {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .admin-panel.wide {
@@ -1102,6 +1120,12 @@ a {
   width: auto;
   padding: 0 16px;
   margin-bottom: 12px;
+}
+
+.admin-reset-button {
+  width: auto;
+  padding: 0 16px;
+  margin-top: 10px;
 }
 
 @media (max-width: 820px) {

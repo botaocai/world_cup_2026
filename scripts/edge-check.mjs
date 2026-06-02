@@ -68,6 +68,7 @@ function seedEdgeData() {
   const inviteId = crypto.randomUUID();
   const matchId = crypto.randomUUID();
   const h2hOddsId = crypto.randomUUID();
+  const totalsOddsId = crypto.randomUUID();
   const scoreOddsId = crypto.randomUUID();
   const closedMatchId = crypto.randomUUID();
   const closedOddsId = crypto.randomUUID();
@@ -117,6 +118,17 @@ function seedEdgeData() {
       fetchedAt: new Date().toISOString(),
     },
     {
+      id: totalsOddsId,
+      matchId,
+      market: "totals",
+      selection: "over",
+      label: "Over 1.5",
+      line: 1.5,
+      price: 1.9,
+      bookmaker: "edge",
+      fetchedAt: new Date().toISOString(),
+    },
+    {
       id: scoreOddsId,
       matchId,
       market: "correct_score",
@@ -138,7 +150,7 @@ function seedEdgeData() {
     },
   );
   writeDb(db);
-  return { code, h2hOddsId, scoreOddsId, closedOddsId, matchId };
+  return { code, h2hOddsId, totalsOddsId, scoreOddsId, closedOddsId, matchId };
 }
 
 async function run() {
@@ -202,6 +214,13 @@ async function run() {
     });
     assert(correctScoreBet.response.status === 200, "correct score bet should succeed");
 
+    const totalsBet = await request("/api/bets", {
+      method: "POST",
+      headers: { Cookie: cookie },
+      body: JSON.stringify({ kind: "match", oddsId: ids.totalsOddsId, stake: 30 }),
+    });
+    assert(totalsBet.response.status === 200, "totals bet should succeed");
+
     const unauthAdjust = await request("/api/admin/adjust-balance", {
       method: "POST",
       headers: { "x-admin-password": "wrong" },
@@ -241,14 +260,17 @@ async function run() {
 
     db = readDb();
     const user = db.users.find((item) => item.id === userId);
-    assert(user.balance === 3000 - 100 - 20 + 250 - 125, "admin add/deduct and stakes should update balance correctly");
+    assert(user.balance === 3000 - 100 - 20 - 30 + 250 - 125, "admin add/deduct and stakes should update balance correctly");
 
     const manualResult = await admin("/api/admin/matches/result", {
       method: "POST",
       body: JSON.stringify({ matchId: ids.matchId, homeScore: 2, awayScore: 0 }),
     });
     assert(manualResult.response.status === 200, "manual match result should update and settle");
-    assert(manualResult.body.settled.length >= 2, "manual match result should settle pending match bets");
+    assert(manualResult.body.settled.length >= 3, "manual match result should settle pending match bets");
+    assert(manualResult.body.markets.h2h >= 1, "manual result should settle h2h bets");
+    assert(manualResult.body.markets.totals >= 1, "manual result should settle totals bets");
+    assert(manualResult.body.markets.correct_score >= 1, "manual result should settle correct score bets");
 
     db = readDb();
     const bet = db.bets.find((item) => item.oddsSnapshotId === ids.h2hOddsId);
@@ -288,6 +310,18 @@ async function run() {
       assert(String(exported.body.raw || JSON.stringify(exported.body)).length > 20, `${type} export should return data`);
     }
 
+    const reset = await admin("/api/admin/balances/reset", { method: "POST" });
+    assert(reset.response.status === 200, "admin reset balances should succeed");
+    db = readDb();
+    assert(db.users.every((item) => item.balance === 3000), "reset balances should set every user to initial balance");
+
+    const restoreJson = JSON.parse(fs.readFileSync(backupPath, "utf8"));
+    const importDb = await admin("/api/admin/db/import", {
+      method: "POST",
+      body: JSON.stringify(restoreJson),
+    });
+    assert(importDb.response.status === 200, "admin db import should succeed");
+
     const autoBackups = fs.existsSync(autoBackupDir) ? fs.readdirSync(autoBackupDir).filter((file) => file.endsWith(".json")) : [];
     assert(autoBackups.length > 0, "automatic db backups should be created during writes");
 
@@ -301,6 +335,7 @@ async function run() {
         "cutoff rejected",
         "normal bet",
         "correct score bet",
+        "totals bet",
         "admin wrong password rejected",
         "zero adjustment rejected",
         "missing user adjustment rejected",
@@ -308,10 +343,13 @@ async function run() {
         "admin add points",
         "admin deduct points",
         "manual match result settlement",
+        "manual h2h/totals/correct score settlement",
         "settled bet cancel rejected",
         "AI multi-turn player analysis",
         "dashboard transaction audit",
         "admin exports",
+        "admin reset balances",
+        "admin db import",
         "automatic db backups",
       ],
     };

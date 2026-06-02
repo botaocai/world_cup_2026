@@ -70,9 +70,15 @@ export function settleBet(bet: Bet, match: Pick<Match, "homeScore" | "awayScore"
 export function settleMatchBets(db: Db, match: Match) {
   const settledAt = timestamp();
   const settled = [];
-  const pendingBets = db.bets.filter((bet) => bet.matchId === match.id && bet.status === "pending");
+  const pendingBets = db.bets.filter((bet) => {
+    if (bet.status !== "pending") return false;
+    if (bet.matchId === match.id) return true;
+    const odds = bet.oddsSnapshotId ? db.oddsSnapshots.find((item) => item.id === bet.oddsSnapshotId) : null;
+    return odds?.matchId === match.id;
+  });
 
   for (const bet of pendingBets) {
+    if (!bet.matchId) bet.matchId = match.id;
     const result = settleBet(bet, match);
     bet.status = result.status;
     bet.profit = result.profit;
@@ -95,6 +101,7 @@ export function settleMatchBets(db: Db, match: Match) {
 
     settled.push({
       orderNo: bet.orderNo,
+      market: bet.market,
       selection: bet.selectionLabel,
       status: bet.status,
       payout: result.payout,

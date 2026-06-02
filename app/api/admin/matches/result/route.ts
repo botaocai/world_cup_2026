@@ -36,6 +36,10 @@ export async function POST(request: Request) {
   match.lastSyncedAt = timestamp();
 
   const settled = settleMatchBets(db, match);
+  const markets = settled.reduce<Record<string, number>>((map, bet) => {
+    map[bet.market] = (map[bet.market] || 0) + 1;
+    return map;
+  }, {});
   writeDb(db);
 
   return NextResponse.json({
@@ -47,5 +51,6 @@ export async function POST(request: Request) {
       status: match.status,
     },
     settled,
+    markets,
   });
 }
