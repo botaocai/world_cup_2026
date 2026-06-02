@@ -73,6 +73,30 @@ a {
   font-weight: 800;
 }
 
+.player-name,
+.balance-label {
+  font-size: 12px;
+  color: #d8cfc6;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: right;
+}
+
+.logout-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  display: inline-grid;
+  place-items: center;
+}
+
 .content {
   padding: 16px 14px 104px;
 }

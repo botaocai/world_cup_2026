@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { readDb } from "@/lib/store";
-import { teamZh } from "@/lib/teams";
 
 function isAdmin(request: Request) {
   const password = request.headers.get("x-admin-password");
@@ -18,7 +17,8 @@ function csv(headers: string[], rows: Array<Array<unknown>>) {
 }
 
 function download(body: string, filename: string, contentType = "text/csv; charset=utf-8") {
-  return new NextResponse(body, {
+  const payload = contentType.startsWith("text/csv") ? `\uFEFF${body}` : body;
+  return new NextResponse(payload, {
     headers: {
       "Content-Type": contentType,
       "Content-Disposition": `attachment; filename="${filename}"`,
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
   if (type === "players") {
     return download(
       csv(
-        ["玩家", "邀请码", "余额", "总下注", "待结算", "已结算", "总投注额", "待结算本金", "已结算盈亏", "创建时间", "最后登录"],
+        ["Player", "InviteCode", "Balance", "TotalBets", "PendingBets", "SettledBets", "TotalStake", "PendingStake", "SettledProfit", "CreatedAt", "LastLoginAt"],
         playerSummaryRows(),
       ),
       "worldcup-player-summary.csv",
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
           bet.orderNo,
           user?.displayName || "",
           bet.type,
-          match ? `${teamZh(match.homeTeam)} vs ${teamZh(match.awayTeam)}` : "",
+          match ? `${match.homeTeam} vs ${match.awayTeam}` : "",
           match?.homeScore !== undefined && match?.awayScore !== undefined ? `${match.homeScore}:${match.awayScore}` : "",
           bet.market,
           bet.selectionLabel,
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
       })
       .sort((a, b) => String(b[12]).localeCompare(String(a[12])));
     return download(
-      csv(["订单号", "玩家", "类型", "比赛", "比分", "玩法", "投注项", "赔率", "本金", "可赢", "状态", "盈亏", "下注时间", "结算时间"], rows),
+      csv(["OrderNo", "Player", "Type", "Match", "Score", "Market", "Selection", "Price", "Stake", "PossiblePayout", "Status", "Profit", "CreatedAt", "SettledAt"], rows),
       "worldcup-bets.csv",
     );
   }
@@ -122,7 +122,7 @@ export async function GET(request: Request) {
         ];
       })
       .sort((a, b) => String(b[0]).localeCompare(String(a[0])));
-    return download(csv(["时间", "玩家", "类型", "订单号", "变动", "余额", "备注"], rows), "worldcup-transactions.csv");
+    return download(csv(["CreatedAt", "Player", "Type", "OrderNo", "Amount", "Balance", "Note"], rows), "worldcup-transactions.csv");
   }
 
   return NextResponse.json({

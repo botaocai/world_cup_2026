@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bot, ChartColumn, ClipboardList, ListOrdered, Trophy } from "lucide-react";
 
 const tabs = [
@@ -15,6 +15,7 @@ const tabs = [
 
 export function BottomTabs() {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <nav className="tabbar">
@@ -26,6 +27,10 @@ export function BottomTabs() {
             className={`tab ${active ? "active" : ""} ${tab.ai ? "ai-tab" : ""}`}
             href={tab.href}
             key={tab.href}
+            onClick={() => {
+              window.dispatchEvent(new Event("worldcup:refresh-user"));
+              router.refresh();
+            }}
           >
             <Icon size={20} />
             <span>{tab.label}</span>

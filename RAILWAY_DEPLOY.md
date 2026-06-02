@@ -20,6 +20,13 @@
 
 系统每次写入数据前，会自动把旧的 `/data/db.json` 复制到 `/data/backups/`。默认保留最近 50 份，可以用 `DB_MAX_BACKUPS` 调整。
 
+如果每次重新部署后数据都会丢，优先检查这两项：
+
+- Volume 必须挂在 Web Service 上，不是只挂在 Cron Service 上。
+- Web Service 的 Variables 必须有 `DATA_DIR=/data`。新版代码在 Railway 里也会默认优先使用 `/data`，但手动写上最稳。
+
+没有 Volume 的情况下，Railway 重新部署会换一个临时容器，本地文件会被清空。
+
 ## 3. 环境变量
 
 在 Railway Variables 里配置：

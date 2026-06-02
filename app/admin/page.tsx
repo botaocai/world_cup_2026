@@ -8,6 +8,8 @@ type BetRow = { id: string; orderNo: string; userName: string; matchTitle: strin
 type TransactionRow = { id: string; userName: string; orderNo: string; amount: number; balance: number; type: string; note?: string; betLabel?: string; createdAt: string };
 type InviteRow = { id: string; code: string; status: string; createdAt: string; usedAt?: string; user?: { displayName: string; balance: number } | null };
 type OutrightRow = { id: string; teamName: string; flag?: string; price: number; bookmaker: string; fetchedAt: string; pendingBets: number };
+type MatchRow = { id: string; homeTeamZh: string; awayTeamZh: string; commenceTime: string; status: string; homeScore?: number; awayScore?: number; pendingBets: number; totalBets: number; groupName?: string };
+type ActiveTab = "players" | "bets" | "settlements" | "invites" | "outrights" | "results";
 type Dashboard = {
   summary: { users: number; totalBalance: number; bets: number; pendingBets: number; netProfit: number; unusedInvites: number };
   users: UserRow[];
@@ -15,10 +17,11 @@ type Dashboard = {
   transactions: TransactionRow[];
   invites: InviteRow[];
   outrights: OutrightRow[];
+  matches: MatchRow[];
 };
 
 const statusText: Record<string, string> = { pending: "待结算", won: "已赢", lost: "已输", void: "已退回" };
-const txText: Record<string, string> = { initial_grant: "初始积分", bet_stake: "下注扣款", bet_settlement: "派奖结算", admin_adjustment: "后台调整", admin_cancel_bet: "取消退回" };
+const txText: Record<string, string> = { initial_grant: "初始积分", bet_stake: "下注扣款", bet_settlement: "派奖结算", admin_adjustment: "后台调整", admin_cancel_bet: "取消退回", outright_settlement: "冠军结算" };
 
 function formatPoints(value: number) {
   return new Intl.NumberFormat("zh-CN").format(value);
@@ -26,13 +29,13 @@ function formatPoints(value: number) {
 
 function formatTime(value?: string) {
   if (!value) return "";
-  return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
+  return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
 }
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [active, setActive] = useState<"players" | "bets" | "settlements" | "invites" | "outrights">("players");
+  const [active, setActive] = useState<ActiveTab>("players");
   const [query, setQuery] = useState("");
   const [adjustUserId, setAdjustUserId] = useState("");
   const [adjustAmount, setAdjustAmount] = useState("");
@@ -42,6 +45,9 @@ export default function AdminPage() {
   const [outrightFlag, setOutrightFlag] = useState("");
   const [outrightPrice, setOutrightPrice] = useState("");
   const [championName, setChampionName] = useState("");
+  const [resultMatchId, setResultMatchId] = useState("");
+  const [homeScore, setHomeScore] = useState("");
+  const [awayScore, setAwayScore] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -114,6 +120,26 @@ export default function AdminPage() {
       setActive("settlements");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "调整失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateMatchResult() {
+    if (!resultMatchId || homeScore === "" || awayScore === "") return setMessage("请选择比赛并填写比分");
+    setLoading(true);
+    try {
+      const data = await request("/api/admin/matches/result", {
+        method: "POST",
+        body: JSON.stringify({ matchId: resultMatchId, homeScore: Number(homeScore), awayScore: Number(awayScore) }),
+      });
+      setMessage(`赛果已更新，并结算 ${data.settled.length} 单`);
+      setHomeScore("");
+      setAwayScore("");
+      await loadDashboard();
+      setActive("bets");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "更新赛果失败");
     } finally {
       setLoading(false);
     }
@@ -230,7 +256,7 @@ export default function AdminPage() {
       <header className="admin-topbar">
         <div>
           <h1>后台管理</h1>
-          <p>管理邀请码、玩家余额、下注记录、结算流水和冠军赔率。</p>
+          <p>管理邀请码、玩家余额、下注记录、结算流水、赛果和冠军赔率。</p>
         </div>
         <div className="admin-login">
           <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="管理员密码" />
@@ -253,7 +279,7 @@ export default function AdminPage() {
 
           <section className="admin-actions">
             <button className="button secondary" onClick={loadDashboard} disabled={loading}><RefreshCw size={16} /> 刷新数据</button>
-            <button className="button secondary" onClick={refreshOdds} disabled={loading}><RefreshCw size={16} /> 刷新赔率</button>
+            <button className="button secondary" onClick={refreshOdds} disabled={loading}><RefreshCw size={16} /> 刷新赔率/赛程</button>
             <button className="button secondary" onClick={generateInvites} disabled={loading}><TicketPlus size={16} /> 生成100个邀请码</button>
             <button className="button secondary" onClick={() => exportData("players")} disabled={loading}><Download size={16} /> 导出玩家汇总</button>
             <button className="button secondary" onClick={() => exportData("bets")} disabled={loading}><Download size={16} /> 导出下注明细</button>
@@ -280,10 +306,11 @@ export default function AdminPage() {
                 ["players", "玩家"],
                 ["bets", "下注记录"],
                 ["settlements", "结算流水"],
+                ["results", "赛果更新"],
                 ["invites", "邀请码"],
                 ["outrights", "冠军赔率"],
               ].map(([id, label]) => (
-                <button key={id} className={active === id ? "active" : ""} onClick={() => setActive(id as typeof active)}>{label}</button>
+                <button key={id} className={active === id ? "active" : ""} onClick={() => setActive(id as ActiveTab)}>{label}</button>
               ))}
             </div>
 
@@ -297,6 +324,7 @@ export default function AdminPage() {
             {active === "players" ? <PlayersTable users={dashboard.users} /> : null}
             {active === "bets" ? <BetsTable bets={filteredBets} onCancel={cancelBet} /> : null}
             {active === "settlements" ? <TransactionsTable transactions={filteredTransactions} /> : null}
+            {active === "results" ? <ResultsPanel matches={dashboard.matches} matchId={resultMatchId} setMatchId={setResultMatchId} homeScore={homeScore} setHomeScore={setHomeScore} awayScore={awayScore} setAwayScore={setAwayScore} onSave={updateMatchResult} /> : null}
             {active === "invites" ? <InvitesTable invites={dashboard.invites} /> : null}
             {active === "outrights" ? (
               <OutrightsPanel
@@ -350,6 +378,39 @@ function BetsTable({ bets, onCancel }: { bets: BetRow[]; onCancel: (betId: strin
 
 function TransactionsTable({ transactions }: { transactions: TransactionRow[] }) {
   return <Table headers={["时间", "玩家", "类型", "订单", "变动", "余额", "备注"]}>{transactions.map((tx) => <tr key={tx.id}><td>{formatTime(tx.createdAt)}</td><td>{tx.userName}</td><td>{txText[tx.type] || tx.type}</td><td>{tx.orderNo || "-"}</td><td className={tx.amount >= 0 ? "profit" : "loss"}>{tx.amount > 0 ? "+" : ""}{formatPoints(tx.amount)}</td><td>{formatPoints(tx.balance)}</td><td>{tx.note || tx.betLabel || "-"}</td></tr>)}</Table>;
+}
+
+function ResultsPanel(props: {
+  matches: MatchRow[];
+  matchId: string;
+  setMatchId: (value: string) => void;
+  homeScore: string;
+  setHomeScore: (value: string) => void;
+  awayScore: string;
+  setAwayScore: (value: string) => void;
+  onSave: () => void;
+}) {
+  const selected = props.matches.find((match) => match.id === props.matchId);
+  return (
+    <>
+      <div className="admin-form-grid results-form">
+        <select className="select" value={props.matchId} onChange={(event) => props.setMatchId(event.target.value)}>
+          <option value="">选择比赛</option>
+          {props.matches.map((match) => (
+            <option value={match.id} key={match.id}>
+              {formatTime(match.commenceTime)} {match.homeTeamZh} vs {match.awayTeamZh}
+            </option>
+          ))}
+        </select>
+        <input className="input" type="number" min={0} value={props.homeScore} onChange={(event) => props.setHomeScore(event.target.value)} placeholder={selected ? `${selected.homeTeamZh}进球` : "主队进球"} />
+        <input className="input" type="number" min={0} value={props.awayScore} onChange={(event) => props.setAwayScore(event.target.value)} placeholder={selected ? `${selected.awayTeamZh}进球` : "客队进球"} />
+        <button className="button" onClick={props.onSave}>更新并结算</button>
+      </div>
+      <Table headers={["时间", "比赛", "状态", "比分", "总订单", "待结算"]}>
+        {props.matches.map((match) => <tr key={match.id}><td>{formatTime(match.commenceTime)}</td><td>{match.homeTeamZh} vs {match.awayTeamZh}</td><td>{match.status}</td><td>{match.homeScore !== undefined && match.awayScore !== undefined ? `${match.homeScore}:${match.awayScore}` : "-"}</td><td>{match.totalBets}</td><td>{match.pendingBets}</td></tr>)}
+      </Table>
+    </>
+  );
 }
 
 function InvitesTable({ invites }: { invites: InviteRow[] }) {

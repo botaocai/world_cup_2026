@@ -138,7 +138,7 @@ function seedEdgeData() {
     },
   );
   writeDb(db);
-  return { code, h2hOddsId, scoreOddsId, closedOddsId };
+  return { code, h2hOddsId, scoreOddsId, closedOddsId, matchId };
 }
 
 async function run() {
@@ -243,11 +243,15 @@ async function run() {
     const user = db.users.find((item) => item.id === userId);
     assert(user.balance === 3000 - 100 - 20 + 250 - 125, "admin add/deduct and stakes should update balance correctly");
 
+    const manualResult = await admin("/api/admin/matches/result", {
+      method: "POST",
+      body: JSON.stringify({ matchId: ids.matchId, homeScore: 2, awayScore: 0 }),
+    });
+    assert(manualResult.response.status === 200, "manual match result should update and settle");
+    assert(manualResult.body.settled.length >= 2, "manual match result should settle pending match bets");
+
+    db = readDb();
     const bet = db.bets.find((item) => item.oddsSnapshotId === ids.h2hOddsId);
-    bet.status = "lost";
-    bet.profit = -bet.stake;
-    bet.settledAt = new Date().toISOString();
-    writeDb(db);
 
     const cancelSettled = await admin("/api/admin/bets/cancel", {
       method: "POST",
@@ -303,6 +307,7 @@ async function run() {
         "negative-balance adjustment rejected",
         "admin add points",
         "admin deduct points",
+        "manual match result settlement",
         "settled bet cancel rejected",
         "AI multi-turn player analysis",
         "dashboard transaction audit",

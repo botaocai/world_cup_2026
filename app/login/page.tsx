@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -11,16 +11,22 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const savedCode = window.localStorage.getItem("worldcup_last_invite_code");
+    if (savedCode) setCode(savedCode);
+  }, []);
+
   async function login(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
 
+    const normalizedCode = code.trim().toUpperCase();
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        code,
+        code: normalizedCode,
         displayName: needsDisplayName ? displayName : undefined,
       }),
     });
@@ -34,6 +40,7 @@ export default function LoginPage() {
       return;
     }
 
+    window.localStorage.setItem("worldcup_last_invite_code", normalizedCode);
     router.push("/app/matches");
     router.refresh();
   }
@@ -48,7 +55,7 @@ export default function LoginPage() {
         <input
           className="input"
           value={code}
-          onChange={(event) => setCode(event.target.value)}
+          onChange={(event) => setCode(event.target.value.toUpperCase())}
           placeholder="输入邀请码"
           autoFocus
         />
@@ -64,7 +71,7 @@ export default function LoginPage() {
           </>
         ) : null}
         <div style={{ height: 12 }} />
-        <button className="button" disabled={loading}>
+        <button className="button" disabled={loading || !code.trim()}>
           {loading ? "登录中..." : needsDisplayName ? "创建账号" : "进入竞猜"}
         </button>
         {error ? <div className="error">{error}</div> : null}

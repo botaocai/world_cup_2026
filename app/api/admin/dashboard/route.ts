@@ -81,6 +81,16 @@ export async function GET(request: Request) {
     }))
     .sort((a, b) => a.price - b.price);
 
+  const matches = db.matches
+    .map((match) => ({
+      ...match,
+      homeTeamZh: teamZh(match.homeTeam),
+      awayTeamZh: teamZh(match.awayTeam),
+      pendingBets: db.bets.filter((bet) => bet.matchId === match.id && bet.status === "pending").length,
+      totalBets: db.bets.filter((bet) => bet.matchId === match.id).length,
+    }))
+    .sort((a, b) => a.commenceTime.localeCompare(b.commenceTime));
+
   const summary = {
     users: db.users.length,
     totalBalance: db.users.reduce((sum, user) => sum + user.balance, 0),
@@ -94,5 +104,5 @@ export async function GET(request: Request) {
     unusedInvites: db.inviteCodes.filter((invite) => invite.status === "unused").length,
   };
 
-  return NextResponse.json({ summary, users, bets, transactions, invites, outrights });
+  return NextResponse.json({ summary, users, bets, transactions, invites, outrights, matches });
 }

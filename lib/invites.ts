@@ -1,11 +1,11 @@
 import crypto from "node:crypto";
 import { createId, readDb, timestamp, writeDb } from "@/lib/store";
 
-const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 export function createInviteCode() {
-  let code = "WC";
-  for (let i = 0; i < 8; i += 1) {
+  let code = "";
+  for (let i = 0; i < 6; i += 1) {
     code += ALPHABET[crypto.randomInt(ALPHABET.length)];
   }
   return code;

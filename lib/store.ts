@@ -101,7 +101,13 @@ export type Db = {
   walletTransactions: WalletTransaction[];
 };
 
-const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
+function defaultDataDir() {
+  if (process.env.DATA_DIR) return process.env.DATA_DIR;
+  if (process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID) return "/data";
+  return path.join(process.cwd(), "data");
+}
+
+const dataDir = defaultDataDir();
 const dbPath = path.join(dataDir, "db.json");
 const backupDir = path.join(dataDir, "backups");
 const maxBackups = Number(process.env.DB_MAX_BACKUPS || 50);

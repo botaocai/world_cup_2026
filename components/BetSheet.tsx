@@ -89,6 +89,7 @@ function BetSheet({
       return;
     }
 
+    window.dispatchEvent(new Event("worldcup:refresh-user"));
     onClose();
     router.push("/app/bets");
     router.refresh();
