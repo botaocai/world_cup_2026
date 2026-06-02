@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String              @id @default(cuid())
+  inviteCodeId String              @unique
+  displayName  String
+  balance      Int                 @default(3000)
+  createdAt    DateTime            @default(now())
+  lastLoginAt  DateTime            @default(now())
+  inviteCode   InviteCode          @relation(fields: [inviteCodeId], references: [id])
+  bets         Bet[]
+  transactions WalletTransaction[]
+}
+
+model InviteCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  status    String    @default("unused")
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+  user      User?
+}
+
+model Team {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  flag     String?
+  fifaCode String?
+  bets     Bet[]
+}
+
+model Match {
+  id            String   @id @default(cuid())
+  externalId    String?  @unique
+  oddsEventId   String?  @unique
+  homeTeam      String
+  awayTeam      String
+  homeFlag      String?
+  awayFlag      String?
+  groupName     String?
+  stage         String   @default("group")
+  commenceTime  DateTime
+  status        String   @default("scheduled")
+  homeScore     Int?
+  awayScore     Int?
+  lastSyncedAt  DateTime?
+  oddsSnapshots OddsSnapshot[]
+  bets          Bet[]
+}
+
+model OddsSnapshot {
+  id            String   @id @default(cuid())
+  matchId       String
+  market        String
+  selection     String
+  label         String
+  line          Float?
+  price         Float
+  bookmaker     String
+  fetchedAt     DateTime @default(now())
+  sourcePayload String?
+  match         Match    @relation(fields: [matchId], references: [id])
+  bets          Bet[]
+
+  @@index([matchId, market])
+}
+
+model OutrightOdds {
+  id            String   @id @default(cuid())
+  teamName      String
+  flag          String?
+  price         Float
+  bookmaker     String
+  fetchedAt     DateTime @default(now())
+  sourcePayload String?
+  bets          Bet[]
+}
+
+model Bet {
+  id              String             @id @default(cuid())
+  orderNo         String             @unique
+  userId          String
+  type            String
+  matchId         String?
+  oddsSnapshotId  String?
+  outrightOddsId  String?
+  teamId          String?
+  market          String
+  selection       String
+  selectionLabel  String
+  line            Float?
+  price           Float
+  stake           Int
+  possiblePayout  Int
+  status          String             @default("pending")
+  profit          Int                @default(0)
+  settledAt       DateTime?
+  createdAt       DateTime           @default(now())
+  user            User               @relation(fields: [userId], references: [id])
+  match           Match?             @relation(fields: [matchId], references: [id])
+  oddsSnapshot    OddsSnapshot?      @relation(fields: [oddsSnapshotId], references: [id])
+  outrightOdds    OutrightOdds?      @relation(fields: [outrightOddsId], references: [id])
+  team            Team?              @relation(fields: [teamId], references: [id])
+  transactions    WalletTransaction[]
+}
+
+model WalletTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  betId     String?
+  amount    Int
+  balance   Int
+  type      String
+  note      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  bet       Bet?     @relation(fields: [betId], references: [id])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

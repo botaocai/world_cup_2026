@@ -1,0 +1,8 @@
+node_modules
+.next
+.env
+.env.local
+worldcup.db
+data/db.json
+*.log
+oddsapi_*.json
