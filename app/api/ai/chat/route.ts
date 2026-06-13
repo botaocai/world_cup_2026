@@ -354,6 +354,17 @@ function systemPrompt(context: string) {
 ${context}`;
 }
 
+function llmModels() {
+  const models = [
+    process.env.LLM_MODEL || "gpt-5.4-mini",
+    ...(process.env.LLM_FALLBACK_MODELS || "gpt-5.3-chat,gemini-3.1-pro-preview")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  ];
+  return [...new Set(models)];
+}
+
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
@@ -364,8 +375,6 @@ export async function POST(request: Request) {
   const latest = parsed.data.messages.at(-1)?.content || "";
   const apiKey = process.env.LLM_API_KEY;
   const baseUrl = process.env.LLM_BASE_URL || "https://api.openai.com/v1";
-  const model = process.env.LLM_MODEL || "gpt-5.4-mini";
-
   if (!apiKey) {
     return NextResponse.json({
       answer: "AI 通道还没配置 LLM_API_KEY。路径已经准备好了，填入模型 key 后我就能开始分析。",
@@ -374,34 +383,44 @@ export async function POST(request: Request) {
 
   const context = await buildContext(user.id, latest);
   const conversation = parsed.data.messages.slice(-10);
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: systemPrompt(context) },
-        ...conversation.map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
-      ],
-    }),
-  });
+  const messages = [
+    { role: "system", content: systemPrompt(context) },
+    ...conversation.map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
+  ];
+  const errors: string[] = [];
 
-  if (!response.ok) {
-    const detail = await response.text();
-    return NextResponse.json(
-      { error: `AI 服务调用失败：${detail.slice(0, 180)}` },
-      { status: 502 },
-    );
+  for (const model of llmModels()) {
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model, temperature: 0.2, messages }),
+      });
+
+      if (!response.ok) {
+        const detail = await response.text();
+        errors.push(`${model}: ${response.status} ${detail.slice(0, 160)}`);
+        if (![408, 429, 500, 502, 503, 504].includes(response.status)) break;
+        continue;
+      }
+
+      const data = await response.json();
+      const answer = data.choices?.[0]?.message?.content;
+      if (answer) return NextResponse.json({ answer });
+      errors.push(`${model}: empty content`);
+    } catch (error) {
+      errors.push(`${model}: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
   }
 
-  const data = await response.json();
-  const answer = data.choices?.[0]?.message?.content;
-  return NextResponse.json({ answer: answer || "这次没有生成有效回答。" });
+  return NextResponse.json(
+    { error: `AI 服务调用失败：${errors.join(" / ").slice(0, 360)}` },
+    { status: 502 },
+  );
 }

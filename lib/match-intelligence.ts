@@ -234,30 +234,55 @@ function formatOdds(matchId: string) {
     .join("; ");
 }
 
+function llmModels() {
+  const models = [
+    process.env.LLM_MODEL || "gpt-5.4-mini",
+    ...(process.env.LLM_FALLBACK_MODELS || "gpt-5.3-chat,gemini-3.1-pro-preview")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  ];
+  return [...new Set(models)];
+}
+
 async function callLlm(messages: Array<{ role: "system" | "user"; content: string }>, temperature = 0.2) {
   const apiKey = process.env.LLM_API_KEY;
   if (!apiKey) throw new Error("missing LLM_API_KEY");
 
   const baseUrl = process.env.LLM_BASE_URL || "https://api.openai.com/v1";
-  const model = process.env.LLM_MODEL || "gpt-5.4-mini";
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ model, temperature, messages }),
-  });
+  const errors: string[] = [];
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`LLM failed: ${response.status} ${detail.slice(0, 240)}`);
+  for (const model of llmModels()) {
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model, temperature, messages }),
+      });
+
+      if (!response.ok) {
+        const detail = await response.text();
+        errors.push(`${model}: ${response.status} ${detail.slice(0, 180)}`);
+        if (![408, 429, 500, 502, 503, 504].includes(response.status)) break;
+        continue;
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) {
+        errors.push(`${model}: empty content`);
+        continue;
+      }
+      return { content: String(content), model };
+    } catch (error) {
+      errors.push(`${model}: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
   }
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("LLM returned empty content");
-  return { content: String(content), model };
+  throw new Error(`LLM failed after fallback: ${errors.join(" | ").slice(0, 500)}`);
 }
 
 async function buildResearchBrief(match: Match, sources: SearchResult[]) {
