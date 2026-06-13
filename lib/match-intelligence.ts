@@ -439,3 +439,29 @@ export async function refreshDueMatchIntelligence(force = false) {
     results,
   };
 }
+
+export async function refreshUpcomingMatchIntelligence(hours = 24) {
+  const db = readDb();
+  const now = Date.now();
+  const windowMs = Math.max(1, hours) * 60 * 60 * 1000;
+  const matches = db.matches
+    .filter((match) => {
+      if (match.status !== "scheduled") return false;
+      const kickoff = new Date(match.commenceTime).getTime();
+      return Number.isFinite(kickoff) && kickoff > now && kickoff - now <= windowMs;
+    })
+    .sort((a, b) => a.commenceTime.localeCompare(b.commenceTime));
+
+  const results = [];
+  for (const match of matches) {
+    results.push(await generateMatchIntelligence(match.id, true));
+  }
+
+  return {
+    triggerWindowHours: hours,
+    dueMatches: matches.length,
+    generated: results.filter((item) => !item.skipped && !item.failed).length,
+    failed: results.filter((item) => item.failed).length,
+    results,
+  };
+}

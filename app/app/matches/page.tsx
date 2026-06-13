@@ -43,16 +43,34 @@ function marketOrder(odds: PageOdd[], selections: string[]) {
   return odds.sort((a, b) => selections.indexOf(a.selection) - selections.indexOf(b.selection));
 }
 
+function oddsBoost(price: number) {
+  if (!Number.isFinite(price) || price <= 1) return 1;
+  return Math.min(2.5, 1 + Math.log(price) / 2);
+}
+
+function stakeWeight(stake: number) {
+  return Math.sqrt(Math.max(stake, 1));
+}
+
+function spreadStrength(line?: number) {
+  if (line === undefined || !Number.isFinite(line)) return 0.85;
+  if (line < 0) return Math.min(2.1, 1 + Math.abs(line) * 0.35);
+  if (line > 0) return Math.max(0.18, 1 - line * 0.35);
+  return 0.9;
+}
+
 function betLean(bet: Bet) {
   if (bet.market === "h2h") {
-    if (bet.selection === "home") return -1;
-    if (bet.selection === "away") return 1;
+    const strength = 1 * oddsBoost(bet.price);
+    if (bet.selection === "home") return -strength;
+    if (bet.selection === "away") return strength;
     return 0;
   }
 
   if (bet.market === "spreads") {
-    if (bet.selection === "home") return -0.85;
-    if (bet.selection === "away") return 0.85;
+    const strength = spreadStrength(bet.line) * oddsBoost(bet.price);
+    if (bet.selection === "home") return -strength;
+    if (bet.selection === "away") return strength;
     return 0;
   }
 
@@ -61,8 +79,9 @@ function betLean(bet: Bet) {
     if (!score) return 0;
     const home = Number(score[1]);
     const away = Number(score[2]);
-    if (home > away) return -1;
-    if (away > home) return 1;
+    const strength = Math.min(2.2, (1 + Math.max(0, Math.abs(home - away) - 1) * 0.25) * oddsBoost(bet.price));
+    if (home > away) return -strength;
+    if (away > home) return strength;
     return 0;
   }
 
@@ -84,7 +103,7 @@ function matchSupporters(db: Db, matchId: string) {
       );
       if (!bets.length) return null;
       const totalStake = bets.reduce((sum, bet) => sum + bet.stake, 0);
-      const netStake = bets.reduce((sum, bet) => sum + betLean(bet) * bet.stake, 0);
+      const netStake = bets.reduce((sum, bet) => sum + betLean(bet) * stakeWeight(bet.stake), 0);
       return {
         id: user.id,
         name: user.displayName,

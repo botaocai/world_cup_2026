@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { generateMatchIntelligence, refreshDueMatchIntelligence } from "@/lib/match-intelligence";
+import {
+  generateMatchIntelligence,
+  refreshDueMatchIntelligence,
+  refreshUpcomingMatchIntelligence,
+} from "@/lib/match-intelligence";
 
 function isAdmin(request: Request) {
   const password = request.headers.get("x-admin-password");
@@ -13,6 +17,8 @@ export async function POST(request: Request) {
 
   const url = new URL(request.url);
   const force = url.searchParams.get("force") === "1";
+  const hoursParam = Number(url.searchParams.get("hours") || 24);
+  const hours = Number.isFinite(hoursParam) ? hoursParam : 24;
   const body = await request.json().catch(() => ({}));
   const matchIds = Array.isArray(body.matchIds)
     ? body.matchIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
@@ -32,6 +38,8 @@ export async function POST(request: Request) {
     });
   }
 
-  const result = await refreshDueMatchIntelligence(force);
+  const result = force
+    ? await refreshUpcomingMatchIntelligence(hours)
+    : await refreshDueMatchIntelligence(false);
   return NextResponse.json(result);
 }

@@ -83,7 +83,7 @@ export function MatchSupporters({
                   background: supporterColor(supporter.id || supporter.name),
                   zIndex: 1 + index,
                 }}
-                title={`${supporter.name}：${sideText(supporter.lean, homeTeam, awayTeam)}，净值${Math.round(Math.abs(supporter.netStake))}分，总下注${supporter.stake}分，${supporter.summary}`}
+                title={`${supporter.name}：${sideText(supporter.lean, homeTeam, awayTeam)}，站队值${Math.round(Math.abs(supporter.netStake))}，总下注${supporter.stake}分，${supporter.summary}`}
               >
                 {initials(supporter.name)}
               </div>

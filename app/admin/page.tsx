@@ -123,6 +123,19 @@ export default function AdminPage() {
     }
   }
 
+  async function forceRefreshIntelligence() {
+    setLoading(true);
+    try {
+      const data = await request("/api/admin/intelligence/refresh?force=1&hours=24", { method: "POST" });
+      setMessage(`AI情报强制刷新完成：未来24小时内刷新 ${data.generated} 场，失败 ${data.failed} 场，共处理 ${data.dueMatches} 场`);
+      await loadDashboard();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "AI情报强制刷新失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function adjustBalance() {
     if (!adjustUserId || !adjustAmount) return setMessage("请选择玩家并输入调整金额");
     setLoading(true);
@@ -377,6 +390,7 @@ export default function AdminPage() {
             <button className="button secondary" onClick={loadDashboard} disabled={loading}><RefreshCw size={16} /> 刷新数据</button>
             <button className="button secondary" onClick={refreshOdds} disabled={loading}><RefreshCw size={16} /> 刷新赔率/赛程</button>
             <button className="button secondary" onClick={refreshIntelligence} disabled={loading}><Bot size={16} /> 生成AI情报</button>
+            <button className="button secondary" onClick={forceRefreshIntelligence} disabled={loading}><Bot size={16} /> 强制刷新24小时AI</button>
             <input className="input" value={inviteNote} onChange={(event) => setInviteNote(event.target.value)} placeholder="本批邀请码备注，可选" />
             <button className="button secondary" onClick={generateInvites} disabled={loading}><TicketPlus size={16} /> 生成100个邀请码</button>
             <button className="button secondary" onClick={() => exportData("players")} disabled={loading}><Download size={16} /> 导出玩家汇总</button>
