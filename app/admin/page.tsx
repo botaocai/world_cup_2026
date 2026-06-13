@@ -112,10 +112,14 @@ export default function AdminPage() {
 
   async function refreshIntelligence() {
     setLoading(true);
+    setMessage("AI情报生成中：正在处理12小时窗口内比赛，可能需要几十秒。");
     try {
       const data = await request("/api/admin/intelligence/refresh", { method: "POST" });
-      setMessage(`AI情报生成完成：生成 ${data.generated} 场，失败 ${data.failed} 场，12小时窗口内待处理 ${data.dueMatches} 场`);
+      const failures = Array.isArray(data.results) ? data.results.filter((item: { failed?: boolean }) => item.failed) : [];
+      const failureText = failures.length ? `；失败原因：${failures.map((item: { error?: string }) => item.error || "未知错误").slice(0, 2).join(" / ")}` : "";
+      const finalMessage = `AI情报生成完成：生成 ${data.generated} 场，失败 ${data.failed} 场，12小时窗口内待处理 ${data.dueMatches} 场${failureText}`;
       await loadDashboard();
+      setMessage(finalMessage);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "AI情报生成失败");
     } finally {
@@ -125,10 +129,14 @@ export default function AdminPage() {
 
   async function forceRefreshIntelligence() {
     setLoading(true);
+    setMessage("AI情报强制刷新中：正在重新收集外网信息并调用模型，线上可能需要1-3分钟，请不要重复点击。");
     try {
       const data = await request("/api/admin/intelligence/refresh?force=1&hours=24", { method: "POST" });
-      setMessage(`AI情报强制刷新完成：未来24小时内刷新 ${data.generated} 场，失败 ${data.failed} 场，共处理 ${data.dueMatches} 场`);
+      const failures = Array.isArray(data.results) ? data.results.filter((item: { failed?: boolean }) => item.failed) : [];
+      const failureText = failures.length ? `；失败原因：${failures.map((item: { error?: string }) => item.error || "未知错误").slice(0, 2).join(" / ")}` : "";
+      const finalMessage = `AI情报强制刷新完成：未来24小时内刷新 ${data.generated} 场，失败 ${data.failed} 场，共处理 ${data.dueMatches} 场${failureText}`;
       await loadDashboard();
+      setMessage(finalMessage);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "AI情报强制刷新失败");
     } finally {

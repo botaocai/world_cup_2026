@@ -5,6 +5,8 @@ import {
   refreshUpcomingMatchIntelligence,
 } from "@/lib/match-intelligence";
 
+export const maxDuration = 300;
+
 function isAdmin(request: Request) {
   const password = request.headers.get("x-admin-password");
   return password && password === (process.env.ADMIN_PASSWORD || "admin");
