@@ -9,7 +9,13 @@ type TransactionRow = { id: string; userName: string; orderNo: string; amount: n
 type InviteRow = { id: string; code: string; status: string; note?: string; createdAt: string; usedAt?: string; user?: { displayName: string; balance: number } | null };
 type OutrightRow = { id: string; teamName: string; flag?: string; price: number; bookmaker: string; fetchedAt: string; pendingBets: number };
 type MatchRow = { id: string; homeTeamZh: string; awayTeamZh: string; commenceTime: string; status: string; homeScore?: number; awayScore?: number; pendingBets: number; totalBets: number; groupName?: string };
-type ActiveTab = "players" | "bets" | "settlements" | "invites" | "outrights" | "results";
+type AiContestAgentRow = { id: string; name: string; provider: string; model: string; balance: number; strategyType?: string; strategy?: string; bankrollRule?: string; status: string; error?: string; totalBets: number; pendingBets: number; profit: number; settledProfit: number };
+type AiContestBetRow = { id: string; agentName: string; matchTitle: string; selectionLabel: string; stake: number; price: number; confidence: string; reason: string; status: string; profit: number; createdAt: string };
+type AiContestRoundRow = { id: string; agentName: string; windowHours: number; matchIds: string[]; strategyType?: string; strategy?: string; bankrollRule?: string; strategyChange?: string; skipReason?: string; error?: string; createdAt: string };
+type AiContestModelRow = { id: string; name: string; provider: string; model: string; apiKeyEnv: string; hasKey: boolean };
+type AiContestDiscussionRow = { id: string; agentName: string; matchTitle: string; stance: string; keyPoints: string[]; preferredAngles: string[]; riskWarning: string; error?: string; createdAt: string };
+type AiContest = { configuredModels: AiContestModelRow[]; agents: AiContestAgentRow[]; bets: AiContestBetRow[]; rounds: AiContestRoundRow[]; discussions: AiContestDiscussionRow[] };
+type ActiveTab = "players" | "bets" | "settlements" | "invites" | "outrights" | "results" | "aiContest";
 type Dashboard = {
   summary: { users: number; totalBalance: number; bets: number; pendingBets: number; netProfit: number; unusedInvites: number };
   users: UserRow[];
@@ -35,6 +41,7 @@ function formatTime(value?: string) {
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [aiContest, setAiContest] = useState<AiContest | null>(null);
   const [active, setActive] = useState<ActiveTab>("players");
   const [query, setQuery] = useState("");
   const [adjustUserId, setAdjustUserId] = useState("");
@@ -139,6 +146,38 @@ export default function AdminPage() {
       setMessage(finalMessage);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "AI情报强制刷新失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadAiContest() {
+    setLoading(true);
+    try {
+      const data = await request("/api/admin/ai-contest");
+      setAiContest(data);
+      setMessage("AI下注王沙盒已刷新");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "AI下注王读取失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function aiContestAction(action: "init" | "run" | "reset") {
+    if (action === "reset" && !window.confirm("确定重置 AI下注王 沙盒吗？这只会清空 AI 模型账户和 AI 注单，不影响真人数据。")) return;
+    setLoading(true);
+      setMessage(action === "run" ? "AI模型正在先讨论比赛，再制定策略并下注，可能需要几分钟。" : "AI下注王处理中...");
+    try {
+      const data = await request("/api/admin/ai-contest", {
+        method: "POST",
+        body: JSON.stringify({ action, windowHours: 24 }),
+      });
+      setAiContest(data);
+      const errorCount = data.agents?.filter((agent: AiContestAgentRow) => agent.status === "error").length || 0;
+      setMessage(action === "run" ? `AI下注完成：${data.bets?.length || 0} 笔AI注单，${errorCount} 个模型报错` : "AI下注王沙盒已更新");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "AI下注王操作失败");
     } finally {
       setLoading(false);
     }
@@ -435,6 +474,7 @@ export default function AdminPage() {
                 ["results", "赛果更新"],
                 ["invites", "邀请码"],
                 ["outrights", "冠军赔率"],
+                ["aiContest", "AI下注王"],
               ].map(([id, label]) => (
                 <button key={id} className={active === id ? "active" : ""} onClick={() => setActive(id as ActiveTab)}>{label}</button>
               ))}
@@ -452,6 +492,7 @@ export default function AdminPage() {
             {active === "settlements" ? <TransactionsTable transactions={filteredTransactions} /> : null}
             {active === "results" ? <ResultsPanel matches={dashboard.matches} matchId={resultMatchId} setMatchId={setResultMatchId} homeScore={homeScore} setHomeScore={setHomeScore} awayScore={awayScore} setAwayScore={setAwayScore} onSave={updateMatchResult} /> : null}
             {active === "invites" ? <InvitesTable invites={dashboard.invites} onSaveNote={saveInviteNote} /> : null}
+            {active === "aiContest" ? <AiContestPanel contest={aiContest} onLoad={loadAiContest} onAction={aiContestAction} loading={loading} /> : null}
             {active === "outrights" ? (
               <OutrightsPanel
                 outrights={dashboard.outrights}
@@ -592,6 +633,118 @@ function OutrightsPanel(props: {
       <Table headers={["国家", "赔率", "来源", "待结算投注", "更新时间", "操作"]}>
         {props.outrights.map((odd) => <tr key={odd.id}><td><strong>{odd.flag || ""} {odd.teamName}</strong></td><td>{odd.price.toFixed(2)}</td><td>{odd.bookmaker}</td><td>{odd.pendingBets}</td><td>{formatTime(odd.fetchedAt)}</td><td><button className="mini-button" onClick={() => props.onEdit(odd)}>编辑</button> <button className="mini-danger" onClick={() => props.onDelete(odd.id)}><Trash2 size={13} /> 删除</button></td></tr>)}
       </Table>
+    </>
+  );
+}
+
+function AiContestPanel({
+  contest,
+  onLoad,
+  onAction,
+  loading,
+}: {
+  contest: AiContest | null;
+  onLoad: () => void;
+  onAction: (action: "init" | "run" | "reset") => void;
+  loading: boolean;
+}) {
+  return (
+    <>
+      <div className="admin-form-grid">
+        <button className="button secondary" onClick={onLoad} disabled={loading}>刷新AI沙盒</button>
+        <button className="button secondary" onClick={() => onAction("init")} disabled={loading}>初始化模型账户</button>
+        <button className="button" onClick={() => onAction("run")} disabled={loading}>未来24小时下注</button>
+        <button className="button secondary admin-danger-reset-button" onClick={() => onAction("reset")} disabled={loading}>重置AI大赛</button>
+      </div>
+
+      {!contest ? <p className="muted">先点击“刷新AI沙盒”。这里的数据独立于真人玩家和真人下注。</p> : null}
+
+      {contest ? (
+        <>
+          <h3 className="admin-subtitle">模型配置</h3>
+          <Table headers={["模型", "供应商", "Model", "Key变量", "Key状态"]}>
+            {contest.configuredModels.map((model) => (
+              <tr key={model.id}>
+                <td><strong>{model.name}</strong></td>
+                <td>{model.provider}</td>
+                <td>{model.model}</td>
+                <td>{model.apiKeyEnv}</td>
+                <td>{model.hasKey ? "已配置" : "缺少Key"}</td>
+              </tr>
+            ))}
+            {contest.configuredModels.length === 0 ? <tr><td colSpan={5}>暂无模型。配置 AI_CONTEST_MODELS 或 LLM_API_KEY 后再初始化。</td></tr> : null}
+          </Table>
+
+          <h3 className="admin-subtitle">AI积分榜</h3>
+          <Table headers={["AI", "余额", "盈亏", "状态", "下注", "待结算", "流派", "策略", "资金管理", "错误"]}>
+            {contest.agents.map((agent) => (
+              <tr key={agent.id}>
+                <td><strong>{agent.name}</strong><br /><span className="muted">{agent.model}</span></td>
+                <td>{formatPoints(agent.balance)}</td>
+                <td className={agent.profit >= 0 ? "profit" : "loss"}>{agent.profit > 0 ? "+" : ""}{formatPoints(agent.profit)}</td>
+                <td>{agent.status}</td>
+                <td>{agent.totalBets}</td>
+                <td>{agent.pendingBets}</td>
+                <td>{agent.strategyType || "-"}</td>
+                <td>{agent.strategy || "-"}</td>
+                <td>{agent.bankrollRule || "-"}</td>
+                <td>{agent.error || "-"}</td>
+              </tr>
+            ))}
+          </Table>
+
+          <h3 className="admin-subtitle">AI下注记录</h3>
+          <Table headers={["时间", "AI", "比赛", "投注项", "金额", "赔率", "信心", "状态", "盈亏", "理由"]}>
+            {contest.bets.slice(0, 80).map((bet) => (
+              <tr key={bet.id}>
+                <td>{formatTime(bet.createdAt)}</td>
+                <td>{bet.agentName}</td>
+                <td>{bet.matchTitle}</td>
+                <td>{bet.selectionLabel}</td>
+                <td>{formatPoints(bet.stake)}</td>
+                <td>{bet.price.toFixed(2)}</td>
+                <td>{bet.confidence}</td>
+                <td>{statusText[bet.status] || bet.status}</td>
+                <td className={bet.profit >= 0 ? "profit" : "loss"}>{bet.status === "pending" ? "-" : `${bet.profit > 0 ? "+" : ""}${formatPoints(bet.profit)}`}</td>
+                <td>{bet.reason || "-"}</td>
+              </tr>
+            ))}
+          </Table>
+
+          <h3 className="admin-subtitle">赛前讨论</h3>
+          <Table headers={["时间", "AI", "比赛", "立场", "关键点", "可考虑玩法", "风险"]}>
+            {contest.discussions.slice(0, 80).map((discussion) => (
+              <tr key={discussion.id}>
+                <td>{formatTime(discussion.createdAt)}</td>
+                <td>{discussion.agentName}</td>
+                <td>{discussion.matchTitle}</td>
+                <td>{discussion.stance}</td>
+                <td>{discussion.keyPoints.join(" / ") || "-"}</td>
+                <td>{discussion.preferredAngles.join(" / ") || "-"}</td>
+                <td>{discussion.error || discussion.riskWarning || "-"}</td>
+              </tr>
+            ))}
+          </Table>
+
+          <h3 className="admin-subtitle">策略轮次</h3>
+          <Table headers={["时间", "AI", "窗口", "比赛数", "流派", "策略", "策略变化", "资金管理", "跳过原因", "错误"]}>
+            {contest.rounds.slice(0, 50).map((round) => (
+              <tr key={round.id}>
+                <td>{formatTime(round.createdAt)}</td>
+                <td>{round.agentName}</td>
+                <td>{round.windowHours}h</td>
+                <td>{round.matchIds.length}</td>
+                <td>{round.strategyType || "-"}</td>
+                <td>{round.strategy || "-"}</td>
+                <td>{round.strategyChange || "-"}</td>
+                <td>{round.bankrollRule || "-"}</td>
+                <td>{round.skipReason || "-"}</td>
+                <td>{round.error || "-"}</td>
+              </tr>
+            ))}
+          </Table>
+        </>
+      ) : null}
     </>
   );
 }

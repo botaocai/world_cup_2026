@@ -7,7 +7,7 @@ import { Bot, ChartColumn, ClipboardList, ListOrdered, Trophy } from "lucide-rea
 const tabs = [
   { href: "/app/matches", label: "赛事竞猜", icon: Trophy },
   { href: "/app/outrights", label: "冠军竞猜", icon: Trophy },
-  { href: "/app/ai", label: "问问AI", icon: Bot, ai: true },
+  { href: "/app/ai", label: "AI下注王", icon: Bot, ai: true },
   { href: "/app/bets", label: "投注记录", icon: ClipboardList },
   { href: "/app/ledger", label: "盈亏记录", icon: ChartColumn },
   { href: "/app/leaderboard", label: "排行榜", icon: ListOrdered },

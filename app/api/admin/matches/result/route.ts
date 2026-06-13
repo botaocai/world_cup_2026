@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { settleAiContestBets } from "@/lib/ai-contest";
 import { settleMatchBets } from "@/lib/settlement";
 import { readDb, timestamp, writeDb } from "@/lib/store";
 
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
   match.lastSyncedAt = timestamp();
 
   const settled = settleMatchBets(db, match);
+  const aiSettled = settleAiContestBets(db, match);
   const markets = settled.reduce<Record<string, number>>((map, bet) => {
     map[bet.market] = (map[bet.market] || 0) + 1;
     return map;
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
       status: match.status,
     },
     settled,
+    aiSettled,
     markets,
   });
 }

@@ -1159,6 +1159,367 @@ a {
   font-weight: 700;
 }
 
+.ai-contest-page {
+  display: grid;
+  gap: 12px;
+  padding: 10px 10px 92px;
+}
+
+.ai-contest-hero {
+  min-height: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 8px;
+  background: #3f3125;
+  color: #fff;
+}
+
+.ai-contest-hero p,
+.ai-contest-hero h2,
+.ai-contest-hero span {
+  margin: 0;
+}
+
+.ai-contest-hero p {
+  color: #d9bf77;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ai-contest-hero h2 {
+  margin-top: 4px;
+  font-size: 26px;
+}
+
+.ai-contest-hero span {
+  display: block;
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ai-contest-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(78px, 1fr));
+  gap: 7px;
+  overflow-x: auto;
+}
+
+.ai-contest-tabs button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ai-contest-tabs button.active {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+}
+
+.ai-contest-section {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.ai-section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  color: var(--brand);
+}
+
+.ai-section-title h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.ai-agent-list,
+.ai-match-list,
+.ai-bet-list,
+.ai-round-list {
+  display: grid;
+  gap: 9px;
+}
+
+.ai-agent-card,
+.ai-match-card,
+.ai-bet-card,
+.ai-round-card {
+  border: 1px solid #eee8df;
+  border-radius: 8px;
+  background: #fffdf9;
+  padding: 10px;
+}
+
+.ai-agent-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: start;
+}
+
+.ai-agent-rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #efe9e0;
+  color: var(--brand);
+  font-weight: 900;
+}
+
+.ai-agent-main {
+  min-width: 0;
+}
+
+.ai-agent-main strong,
+.ai-agent-main span,
+.ai-agent-score strong,
+.ai-agent-score span {
+  display: block;
+}
+
+.ai-agent-main span,
+.ai-agent-card small,
+.ai-round-card small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ai-agent-score {
+  text-align: right;
+}
+
+.ai-agent-card p,
+.ai-agent-card small,
+.ai-agent-card em,
+.ai-style-pill {
+  grid-column: 2 / 4;
+  margin: 0;
+}
+
+.ai-style-pill,
+.ai-round-type {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border: 1px solid #e0d5c7;
+  border-radius: 999px;
+  background: #f7efe3;
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px 8px;
+}
+
+.ai-agent-card p {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ai-agent-card .ai-strategy-change {
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-agent-card em {
+  color: #ad352f;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.ai-match-card header,
+.ai-bet-card header,
+.ai-round-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ai-match-card header span,
+.ai-bet-card header span,
+.ai-round-card header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ai-discussion-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-discussion {
+  padding: 9px;
+  border-radius: 7px;
+  background: #f8f6f2;
+}
+
+.ai-discussion b,
+.ai-discussion p,
+.ai-discussion span,
+.ai-discussion small,
+.ai-bet-card b,
+.ai-bet-card div,
+.ai-bet-card p,
+.ai-round-card p {
+  display: block;
+}
+
+.ai-discussion p,
+.ai-bet-card p,
+.ai-round-card p {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ai-round-type {
+  margin: 0 0 4px;
+}
+
+.ai-discussion span,
+.ai-discussion small,
+.ai-bet-card div {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ai-match-bets {
+  display: grid;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.ai-match-bets span {
+  border-radius: 6px;
+  background: #fff6dc;
+  color: var(--brand);
+  padding: 7px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-bet-agent-card {
+  border: 1px solid #eee8df;
+  border-radius: 8px;
+  background: #fffdf9;
+  padding: 10px;
+}
+
+.ai-bet-agent-card > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.ai-bet-agent-card > header span,
+.ai-bet-block h4,
+.ai-bet-line p,
+.ai-bet-line span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ai-bet-agent-card > header strong,
+.ai-bet-agent-card > header span {
+  display: block;
+}
+
+.ai-model-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.ai-model-tabs button {
+  border: 1px solid #e5dbcf;
+  border-radius: 7px;
+  background: #f8f6f2;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 0 6px;
+}
+
+.ai-model-tabs button.active {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+}
+
+.ai-bet-block {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid #f0e8dd;
+  padding-top: 9px;
+}
+
+.ai-bet-block + .ai-bet-block {
+  margin-top: 10px;
+}
+
+.ai-bet-block h4 {
+  margin: 0;
+  color: var(--brand);
+  font-weight: 900;
+}
+
+.ai-bet-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  border-radius: 7px;
+  background: #f8f6f2;
+  padding: 8px;
+}
+
+.ai-bet-line.settled {
+  background: #faf9f6;
+}
+
+.ai-bet-line b,
+.ai-bet-line span,
+.ai-bet-line p {
+  display: block;
+}
+
+.ai-bet-meta {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ai-bet-meta strong {
+  display: block;
+  font-size: 12px;
+}
+
 .ai-messages {
   display: flex;
   flex-direction: column;
@@ -1392,6 +1753,12 @@ a {
 .admin-tabs button.active {
   background: var(--brand);
   color: #fff;
+}
+
+.admin-subtitle {
+  margin: 20px 0 10px;
+  font-size: 16px;
+  color: var(--brand);
 }
 
 .admin-search {

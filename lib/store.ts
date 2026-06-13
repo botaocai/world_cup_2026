@@ -109,6 +109,75 @@ export type MatchIntelligence = {
   }>;
 };
 
+export type AiContestAgent = {
+  id: string;
+  name: string;
+  provider: string;
+  model: string;
+  baseUrl: string;
+  balance: number;
+  strategyType?: string;
+  strategy?: string;
+  bankrollRule?: string;
+  status: "active" | "disabled" | "error";
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiContestBet = {
+  id: string;
+  roundId: string;
+  agentId: string;
+  type?: "match" | "outright";
+  matchId?: string;
+  oddsSnapshotId?: string;
+  outrightOddsId?: string;
+  market: string;
+  selection: string;
+  selectionLabel: string;
+  line?: number;
+  price: number;
+  stake: number;
+  possiblePayout: number;
+  confidence: "low" | "medium" | "high";
+  reason: string;
+  status: "pending" | "won" | "lost" | "void";
+  profit: number;
+  settledAt?: string;
+  createdAt: string;
+};
+
+export type AiContestRound = {
+  id: string;
+  agentId: string;
+  trigger: "manual" | "scheduled";
+  windowHours: number;
+  matchIds: string[];
+  prompt: string;
+  rawResponse?: string;
+  strategyType?: string;
+  strategy?: string;
+  bankrollRule?: string;
+  strategyChange?: string;
+  skipReason?: string;
+  error?: string;
+  createdAt: string;
+};
+
+export type AiContestDiscussion = {
+  id: string;
+  agentId: string;
+  matchId: string;
+  stance: string;
+  keyPoints: string[];
+  preferredAngles: string[];
+  riskWarning: string;
+  rawResponse?: string;
+  error?: string;
+  createdAt: string;
+};
+
 export type Db = {
   users: User[];
   inviteCodes: InviteCode[];
@@ -118,6 +187,10 @@ export type Db = {
   bets: Bet[];
   walletTransactions: WalletTransaction[];
   matchIntelligence: MatchIntelligence[];
+  aiContestAgents: AiContestAgent[];
+  aiContestBets: AiContestBet[];
+  aiContestRounds: AiContestRound[];
+  aiContestDiscussions: AiContestDiscussion[];
 };
 
 function defaultDataDir() {
@@ -229,6 +302,10 @@ function seedDb(): Db {
     bets: [],
     walletTransactions: [],
     matchIntelligence: [],
+    aiContestAgents: [],
+    aiContestBets: [],
+    aiContestRounds: [],
+    aiContestDiscussions: [],
   };
 }
 
@@ -241,6 +318,10 @@ export function readDb(): Db {
   }
   const db = JSON.parse(fs.readFileSync(dbPath, "utf8")) as Db;
   db.matchIntelligence ||= [];
+  db.aiContestAgents ||= [];
+  db.aiContestBets ||= [];
+  db.aiContestRounds ||= [];
+  db.aiContestDiscussions ||= [];
   return db;
 }
 

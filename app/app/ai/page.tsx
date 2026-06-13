@@ -1,5 +1,6 @@
-import { AiChat } from "@/components/AiChat";
+import { AiContestView } from "@/components/AiContestView";
+import { aiContestDashboard } from "@/lib/ai-contest";
 
 export default function AiPage() {
-  return <AiChat />;
+  return <AiContestView contest={aiContestDashboard()} />;
 }

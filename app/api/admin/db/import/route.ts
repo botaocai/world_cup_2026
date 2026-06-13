@@ -34,6 +34,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "文件不是有效的完整数据库 JSON" }, { status: 400 });
   }
 
+  db.matchIntelligence ||= [];
+  db.aiContestAgents ||= [];
+  db.aiContestBets ||= [];
+  db.aiContestRounds ||= [];
+  db.aiContestDiscussions ||= [];
   writeDb(db);
   return NextResponse.json({
     ok: true,

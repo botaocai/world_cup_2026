@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createId, readDb, timestamp, writeDb } from "@/lib/store";
 import { teamZh } from "@/lib/teams";
+import { settleAiContestOutrights } from "@/lib/ai-contest";
 
 function isAdmin(request: Request) {
   const password = request.headers.get("x-admin-password");
@@ -64,6 +65,8 @@ export async function POST(request: Request) {
     });
   }
 
+  const aiSettled = settleAiContestOutrights(db, champion);
+
   writeDb(db);
-  return NextResponse.json({ ok: true, champion, settled });
+  return NextResponse.json({ ok: true, champion, settled, aiSettled });
 }
