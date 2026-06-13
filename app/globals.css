@@ -526,41 +526,6 @@ a {
   font-size: 13px;
 }
 
-.extra-market-panel {
-  padding-bottom: 8px;
-}
-
-.extra-market-board {
-  display: grid;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.extra-market-group {
-  border: 1px solid #eee8df;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #fff;
-}
-
-.extra-market-title {
-  min-height: 32px;
-  display: grid;
-  place-items: center;
-  padding: 7px 8px;
-  background: #eeece7;
-  color: #4f453b;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.extra-market-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  padding: 7px;
-}
-
 .outright-row {
   display: grid;
   grid-template-columns: 1fr auto;

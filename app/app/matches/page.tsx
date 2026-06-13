@@ -8,10 +8,8 @@ type PageOdd = {
   market: string;
   selection: string;
   label: string;
-  line?: number;
   price: number;
   fetchedAt: Date;
-  sourcePayload?: string;
 };
 
 const BET_CUTOFF_MS = 60 * 1000;
@@ -19,23 +17,13 @@ const BET_CUTOFF_MS = 60 * 1000;
 function latestByMarket(odds: PageOdd[]) {
   const map = new Map<string, PageOdd>();
   for (const odd of odds) {
-    const key = `${odd.market}-${odd.selection}-${odd.line ?? "none"}`;
+    const key = `${odd.market}-${odd.selection}`;
     const current = map.get(key);
     if (!current || current.fetchedAt < odd.fetchedAt) {
       map.set(key, odd);
     }
   }
   return Array.from(map.values());
-}
-
-function isAltMarket(odd: PageOdd) {
-  if (!odd.sourcePayload) return false;
-  try {
-    const payload = JSON.parse(odd.sourcePayload);
-    return String(payload.marketName || "").toLowerCase().includes("alternative");
-  } catch {
-    return false;
-  }
 }
 
 function marketOrder(odds: PageOdd[], selections: string[]) {
@@ -66,15 +54,13 @@ export default async function MatchesPage() {
           match.oddsSnapshots.map((odd) => ({ ...odd, fetchedAt: new Date(odd.fetchedAt) })),
         );
         const spreads = marketOrder(
-          odds.filter((odd) => odd.market === "spreads" && !isAltMarket(odd)),
+          odds.filter((odd) => odd.market === "spreads"),
           ["home", "away"],
         );
         const totals = marketOrder(
-          odds.filter((odd) => odd.market === "totals" && !isAltMarket(odd)),
+          odds.filter((odd) => odd.market === "totals"),
           ["over", "under"],
         );
-        const extraSpreads = odds.filter((odd) => odd.market === "spreads" && isAltMarket(odd));
-        const extraTotals = odds.filter((odd) => odd.market === "totals" && isAltMarket(odd));
         const h2h = marketOrder(
           odds.filter((odd) => odd.market === "h2h"),
           ["home", "draw", "away"],
@@ -102,8 +88,6 @@ export default async function MatchesPage() {
             <MatchMarkets
               spreads={spreads}
               totals={totals}
-              extraSpreads={extraSpreads}
-              extraTotals={extraTotals}
               h2h={h2h}
               correctScores={correctScores}
               context={matchTitle}

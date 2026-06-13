@@ -15,8 +15,6 @@ type PageOdd = {
 export function MatchMarkets({
   spreads,
   totals,
-  extraSpreads,
-  extraTotals,
   h2h,
   correctScores,
   context,
@@ -25,8 +23,6 @@ export function MatchMarkets({
 }: {
   spreads: PageOdd[];
   totals: PageOdd[];
-  extraSpreads: PageOdd[];
-  extraTotals: PageOdd[];
   h2h: PageOdd[];
   correctScores: PageOdd[];
   context: string;
@@ -34,10 +30,8 @@ export function MatchMarkets({
   awayTeam: string;
 }) {
   const [scoreOpen, setScoreOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const scoreGroups = useMemo(() => groupCorrectScores(correctScores), [correctScores]);
   const scoreCount = correctScores.length;
-  const moreCount = extraSpreads.length + extraTotals.length;
 
   return (
     <>
@@ -46,27 +40,6 @@ export function MatchMarkets({
         <MarketColumn title="大小" odds={totals} context={context} />
         <MarketColumn title="独赢" odds={h2h} context={context} />
       </div>
-
-      {moreCount ? (
-        <div className="correct-score-panel extra-market-panel">
-          <button
-            className={`correct-score-toggle ${moreOpen ? "open" : ""}`}
-            onClick={() => setMoreOpen((value) => !value)}
-            type="button"
-          >
-            <span>更多盘口</span>
-            <strong>{moreCount}项</strong>
-            <ChevronDown size={16} aria-hidden />
-          </button>
-          {moreOpen ? (
-            <div className="extra-market-board">
-              {extraSpreads.length ? <ExtraMarketGroup title="更多让球" odds={extraSpreads} context={context} /> : null}
-              {extraTotals.length ? <ExtraMarketGroup title="更多大小" odds={extraTotals} context={context} /> : null}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
       <div className="correct-score-panel">
         <button
           className={`correct-score-toggle ${scoreOpen ? "open" : ""}`}
@@ -93,7 +66,15 @@ export function MatchMarkets({
   );
 }
 
-function MarketColumn({ title, odds, context }: { title: string; odds: PageOdd[]; context: string }) {
+function MarketColumn({
+  title,
+  odds,
+  context,
+}: {
+  title: string;
+  odds: PageOdd[];
+  context: string;
+}) {
   return (
     <div className="market-col">
       <div className="market-title">{title}</div>
@@ -106,29 +87,6 @@ function MarketColumn({ title, odds, context }: { title: string; odds: PageOdd[]
               oddsId: odd.id,
               label: odd.label,
               context,
-              price: odd.price,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ExtraMarketGroup({ title, odds, context }: { title: string; odds: PageOdd[]; context: string }) {
-  return (
-    <div className="extra-market-group">
-      <div className="extra-market-title">{title}</div>
-      <div className="extra-market-grid">
-        {odds.map((odd) => (
-          <BetButton
-            key={odd.id}
-            compact
-            selection={{
-              kind: "match",
-              oddsId: odd.id,
-              label: odd.label,
-              context: `${context} ${title}`,
               price: odd.price,
             }}
           />
