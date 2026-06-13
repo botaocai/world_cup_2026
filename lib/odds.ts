@@ -5,7 +5,7 @@ const THE_ODDS_SPORT_KEY = process.env.ODDS_SPORT_KEY || "soccer_fifa_world_cup"
 const THE_ODDS_BOOKMAKER = process.env.ODDS_BOOKMAKER || "pinnacle";
 
 const ODDS_API_IO_SPORT = process.env.ODDS_API_IO_SPORT || "football";
-const ODDS_API_IO_LEAGUE = process.env.ODDS_API_IO_LEAGUE || "international-world-cup";
+const ODDS_API_IO_LEAGUE = process.env.ODDS_API_IO_LEAGUE || "international-fifa-world-cup";
 const ODDS_API_IO_BOOKMAKERS = (process.env.ODDS_API_IO_BOOKMAKERS || "Bet365,BetMGM")
   .split(",")
   .map((item) => item.trim())
@@ -143,6 +143,10 @@ function writeSnapshots(
   }
 }
 
+function sourcePayload(marketName: string, payload: unknown) {
+  return { marketName, payload };
+}
+
 function selectionForTheOddsOutcome(event: TheOddsEvent, market: string, outcome: TheOddsOutcome) {
   if (market === "h2h") {
     if (outcome.name === event.home_team) return "home";
@@ -225,7 +229,7 @@ async function refreshMatchOddsFromTheOddsApi() {
         line: outcome.point,
         price: outcome.price,
         bookmaker: bookmaker.key,
-        sourcePayload: outcome,
+        sourcePayload: sourcePayload(market.key, outcome),
       }));
       writeSnapshots(db, match.id, snapshots);
     }
@@ -321,7 +325,7 @@ function oddsApiIoSnapshots(response: OddsApiIoResponse) {
         label: teamZh(response.home),
         price: home,
         bookmaker: mlSource.bookmaker,
-        sourcePayload: mlOdds,
+        sourcePayload: sourcePayload(mlSource.market.name, mlOdds),
       });
     }
     if (draw) {
@@ -331,7 +335,7 @@ function oddsApiIoSnapshots(response: OddsApiIoResponse) {
         label: "\u5e73",
         price: draw,
         bookmaker: mlSource.bookmaker,
-        sourcePayload: mlOdds,
+        sourcePayload: sourcePayload(mlSource.market.name, mlOdds),
       });
     }
     if (away) {
@@ -341,7 +345,7 @@ function oddsApiIoSnapshots(response: OddsApiIoResponse) {
         label: teamZh(response.away),
         price: away,
         bookmaker: mlSource.bookmaker,
-        sourcePayload: mlOdds,
+        sourcePayload: sourcePayload(mlSource.market.name, mlOdds),
       });
     }
   }
@@ -367,7 +371,7 @@ function oddsApiIoSnapshots(response: OddsApiIoResponse) {
         line: spreadLine,
         price: spreadHome,
         bookmaker: spreadSource.bookmaker,
-        sourcePayload: spreadOdds,
+        sourcePayload: sourcePayload(spreadSource.market.name, spreadOdds),
       },
       {
         market: "spreads",
@@ -376,9 +380,54 @@ function oddsApiIoSnapshots(response: OddsApiIoResponse) {
         line: -spreadLine,
         price: spreadAway,
         bookmaker: spreadSource.bookmaker,
-        sourcePayload: spreadOdds,
+        sourcePayload: sourcePayload(spreadSource.market.name, spreadOdds),
       },
     );
+  }
+
+  const mainSpreadLine = spreadLine;
+  const altSpreadSource = pickMarketSource(response, ["Alternative Asian Handicap"]);
+  if (altSpreadSource && mainSpreadLine !== undefined) {
+    const alternatives = altSpreadSource.market.odds
+      .map((odd) => ({
+        odd,
+        hdp: line(odd.hdp),
+        home: decimal(odd.home),
+        away: decimal(odd.away),
+      }))
+      .filter((item): item is { odd: Record<string, string | number>; hdp: number; home: number; away: number } => {
+        return item.hdp !== undefined && Boolean(item.home) && Boolean(item.away) && item.hdp !== mainSpreadLine;
+      })
+      .sort((a, b) => Math.abs(a.hdp - mainSpreadLine) - Math.abs(b.hdp - mainSpreadLine));
+    const lower = alternatives
+      .filter((item) => item.hdp < mainSpreadLine)
+      .sort((a, b) => b.hdp - a.hdp)[0];
+    const higher = alternatives
+      .filter((item) => item.hdp > mainSpreadLine)
+      .sort((a, b) => a.hdp - b.hdp)[0];
+
+    for (const item of [lower, higher].filter(Boolean)) {
+      snapshots.push(
+        {
+          market: "spreads",
+          selection: "home",
+          label: `${teamZh(response.home)} ${formatAsianLine(item.hdp)}`.trim(),
+          line: item.hdp,
+          price: item.home,
+          bookmaker: altSpreadSource.bookmaker,
+          sourcePayload: sourcePayload(altSpreadSource.market.name, item.odd),
+        },
+        {
+          market: "spreads",
+          selection: "away",
+          label: `${teamZh(response.away)} ${formatAsianLine(-item.hdp)}`.trim(),
+          line: -item.hdp,
+          price: item.away,
+          bookmaker: altSpreadSource.bookmaker,
+          sourcePayload: sourcePayload(altSpreadSource.market.name, item.odd),
+        },
+      );
+    }
   }
 
   const totalsSource = marketSources(response, ["Totals", "Goals Over/Under"])
@@ -405,7 +454,7 @@ function oddsApiIoSnapshots(response: OddsApiIoResponse) {
         line: totalOdds.hdp,
         price: over,
         bookmaker: totalsSource.bookmaker,
-        sourcePayload: totalOdds.odd,
+        sourcePayload: sourcePayload(totalsSource.market.name, totalOdds.odd),
       },
       {
         market: "totals",
@@ -414,9 +463,56 @@ function oddsApiIoSnapshots(response: OddsApiIoResponse) {
         line: totalOdds.hdp,
         price: under,
         bookmaker: totalsSource.bookmaker,
-        sourcePayload: totalOdds.odd,
+        sourcePayload: sourcePayload(totalsSource.market.name, totalOdds.odd),
       },
     );
+  }
+
+  const mainTotalLine = totalOdds?.hdp;
+  const altTotalsSource =
+    pickMarketSource(response, ["Alternative Total Goals", "Alternative Goal Line", "Alternative Totals", "Alternative Goals Over/Under"]) ||
+    totalsSource;
+  if (altTotalsSource && mainTotalLine !== undefined) {
+    const alternatives = altTotalsSource.market.odds
+      .map((odd) => ({
+        odd,
+        hdp: line(odd.hdp),
+        over: decimal(odd.over),
+        under: decimal(odd.under),
+      }))
+      .filter((item): item is { odd: Record<string, string | number>; hdp: number; over: number; under: number } => {
+        return item.hdp !== undefined && Boolean(item.over) && Boolean(item.under) && item.hdp !== mainTotalLine;
+      });
+    const lower = alternatives
+      .filter((item) => item.hdp < mainTotalLine)
+      .sort((a, b) => b.hdp - a.hdp)[0];
+    const higher = alternatives
+      .filter((item) => item.hdp > mainTotalLine)
+      .sort((a, b) => a.hdp - b.hdp)[0];
+
+    for (const item of [lower, higher].filter(Boolean)) {
+      const totalLabel = formatAsianLine(item.hdp).replace(/^\+/, "");
+      snapshots.push(
+        {
+          market: "totals",
+          selection: "over",
+          label: `\u5927 ${totalLabel}`,
+          line: item.hdp,
+          price: item.over,
+          bookmaker: altTotalsSource.bookmaker,
+          sourcePayload: sourcePayload(altTotalsSource.market.name, item.odd),
+        },
+        {
+          market: "totals",
+          selection: "under",
+          label: `\u5c0f ${totalLabel}`,
+          line: item.hdp,
+          price: item.under,
+          bookmaker: altTotalsSource.bookmaker,
+          sourcePayload: sourcePayload(altTotalsSource.market.name, item.odd),
+        },
+      );
+    }
   }
 
   const correctScoreSource = pickMarketSource(response, ["Correct Score"]);
@@ -431,7 +527,7 @@ function oddsApiIoSnapshots(response: OddsApiIoResponse) {
       label,
       price,
       bookmaker: correctScoreSource.bookmaker,
-      sourcePayload: outcome,
+      sourcePayload: sourcePayload(correctScoreSource.market.name, outcome),
     });
   }
   }
@@ -452,6 +548,14 @@ async function refreshMatchOddsFromOddsApiIo() {
   const db = readDb();
   const touchedMatchIds = new Set<string>();
   const pendingEvents = events.filter((item) => item.status === "pending");
+  if (pendingEvents.length === 0) {
+    return {
+      skipped: true,
+      reason: `Odds-API.io returned 0 pending events for ${ODDS_API_IO_LEAGUE}`,
+      source: "odds-api-io",
+      count: 0,
+    };
+  }
   const eventById = new Map(pendingEvents.map((event) => [String(event.id), event]));
 
   for (const batch of chunk(pendingEvents, 10)) {
@@ -476,6 +580,15 @@ async function refreshMatchOddsFromOddsApiIo() {
     }
   }
 
+  if (touchedMatchIds.size === 0) {
+    return {
+      skipped: true,
+      reason: `Odds-API.io returned odds for 0 events for ${ODDS_API_IO_LEAGUE}`,
+      source: "odds-api-io",
+      count: 0,
+    };
+  }
+
   removeUntouchedMatches(db, touchedMatchIds);
   writeDb(db);
   return {
@@ -494,7 +607,21 @@ function removeUntouchedMatches(db: ReturnType<typeof readDb>, touchedMatchIds: 
 
 export async function refreshMatchOdds() {
   if (process.env.ODDS_API_IO_KEY) {
-    return refreshMatchOddsFromOddsApiIo();
+    try {
+      const result = await refreshMatchOddsFromOddsApiIo();
+      if (!result.skipped && (result.count || 0) > 0) return result;
+      const fallback = await refreshMatchOddsFromTheOddsApi();
+      return { ...fallback, fallbackFrom: result };
+    } catch (error) {
+      const fallback = await refreshMatchOddsFromTheOddsApi();
+      return {
+        ...fallback,
+        fallbackFrom: {
+          source: "odds-api-io",
+          reason: error instanceof Error ? error.message : "Odds-API.io failed",
+        },
+      };
+    }
   }
   return refreshMatchOddsFromTheOddsApi();
 }
@@ -531,7 +658,7 @@ export async function refreshOutrightOdds() {
           price: outcome.price,
           bookmaker: bookmaker.key,
           fetchedAt: timestamp(),
-          sourcePayload: JSON.stringify(outcome),
+          sourcePayload: JSON.stringify(sourcePayload(market.key, outcome)),
         });
       }
     }

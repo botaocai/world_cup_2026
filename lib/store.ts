@@ -92,6 +92,23 @@ export type WalletTransaction = {
   createdAt: string;
 };
 
+export type MatchIntelligence = {
+  id: string;
+  matchId: string;
+  status: "ready" | "failed";
+  title: string;
+  content: string;
+  model: string;
+  generatedAt: string;
+  triggerWindowHours: number;
+  error?: string;
+  sources?: Array<{
+    title: string;
+    url: string;
+    snippet?: string;
+  }>;
+};
+
 export type Db = {
   users: User[];
   inviteCodes: InviteCode[];
@@ -100,6 +117,7 @@ export type Db = {
   outrightOdds: OutrightOdds[];
   bets: Bet[];
   walletTransactions: WalletTransaction[];
+  matchIntelligence: MatchIntelligence[];
 };
 
 function defaultDataDir() {
@@ -210,6 +228,7 @@ function seedDb(): Db {
     })),
     bets: [],
     walletTransactions: [],
+    matchIntelligence: [],
   };
 }
 
@@ -220,7 +239,9 @@ export function readDb(): Db {
     fs.writeFileSync(dbPath, JSON.stringify(seeded, null, 2));
     return seeded;
   }
-  return JSON.parse(fs.readFileSync(dbPath, "utf8")) as Db;
+  const db = JSON.parse(fs.readFileSync(dbPath, "utf8")) as Db;
+  db.matchIntelligence ||= [];
+  return db;
 }
 
 export function writeDb(db: Db) {

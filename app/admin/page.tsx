@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, Coins, Download, RefreshCw, Search, TicketPlus, Trash2 } from "lucide-react";
+import { Ban, Bot, Coins, Download, RefreshCw, Search, TicketPlus, Trash2 } from "lucide-react";
 
 type UserRow = { id: string; displayName: string; balance: number; inviteCode: string; lastLoginAt: string; totalBets: number; pendingBets: number; totalStake: number; netProfit: number };
 type BetRow = { id: string; orderNo: string; userName: string; matchTitle: string; score: string; selectionLabel: string; price: number; stake: number; status: string; profit: number; createdAt: string };
@@ -105,6 +105,19 @@ export default function AdminPage() {
       await loadDashboard();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "刷新失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function refreshIntelligence() {
+    setLoading(true);
+    try {
+      const data = await request("/api/admin/intelligence/refresh", { method: "POST" });
+      setMessage(`AI情报生成完成：生成 ${data.generated} 场，失败 ${data.failed} 场，12小时窗口内待处理 ${data.dueMatches} 场`);
+      await loadDashboard();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "AI情报生成失败");
     } finally {
       setLoading(false);
     }
@@ -222,6 +235,21 @@ export default function AdminPage() {
       await loadDashboard();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "取消失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteUser(userId: string, name: string) {
+    if (!window.confirm(`确定删除玩家「${name}」吗？这会删除他的账号、下注记录和资金流水，并禁用对应邀请码。`)) return;
+    setLoading(true);
+    try {
+      const data = await request("/api/admin/users/delete", { method: "POST", body: JSON.stringify({ userId }) });
+      setMessage(`已删除玩家 ${data.user}，移除 ${data.removed.bets} 条下注、${data.removed.transactions} 条流水`);
+      await loadDashboard();
+      setActive("players");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "删除玩家失败");
     } finally {
       setLoading(false);
     }
@@ -348,6 +376,7 @@ export default function AdminPage() {
           <section className="admin-actions">
             <button className="button secondary" onClick={loadDashboard} disabled={loading}><RefreshCw size={16} /> 刷新数据</button>
             <button className="button secondary" onClick={refreshOdds} disabled={loading}><RefreshCw size={16} /> 刷新赔率/赛程</button>
+            <button className="button secondary" onClick={refreshIntelligence} disabled={loading}><Bot size={16} /> 生成AI情报</button>
             <input className="input" value={inviteNote} onChange={(event) => setInviteNote(event.target.value)} placeholder="本批邀请码备注，可选" />
             <button className="button secondary" onClick={generateInvites} disabled={loading}><TicketPlus size={16} /> 生成100个邀请码</button>
             <button className="button secondary" onClick={() => exportData("players")} disabled={loading}><Download size={16} /> 导出玩家汇总</button>
@@ -396,7 +425,7 @@ export default function AdminPage() {
               </label>
             ) : null}
 
-            {active === "players" ? <PlayersTable users={dashboard.users} /> : null}
+            {active === "players" ? <PlayersTable users={dashboard.users} onDelete={deleteUser} /> : null}
             {active === "bets" ? <BetsTable bets={filteredBets} onCancel={cancelBet} /> : null}
             {active === "settlements" ? <TransactionsTable transactions={filteredTransactions} /> : null}
             {active === "results" ? <ResultsPanel matches={dashboard.matches} matchId={resultMatchId} setMatchId={setResultMatchId} homeScore={homeScore} setHomeScore={setHomeScore} awayScore={awayScore} setAwayScore={setAwayScore} onSave={updateMatchResult} /> : null}
@@ -443,8 +472,8 @@ function SummaryCard({ label, value, signed }: { label: string; value: number; s
   return <div className="summary-card"><span>{label}</span><strong className={signed && value < 0 ? "loss" : signed ? "profit" : ""}>{signed && value > 0 ? "+" : ""}{formatPoints(value)}</strong></div>;
 }
 
-function PlayersTable({ users }: { users: UserRow[] }) {
-  return <Table headers={["玩家", "邀请码", "余额", "下注", "待结算", "总投注", "净盈亏", "最后登录"]}>{users.map((u) => <tr key={u.id}><td><strong>{u.displayName}</strong></td><td>{u.inviteCode}</td><td>{formatPoints(u.balance)}</td><td>{u.totalBets}</td><td>{u.pendingBets}</td><td>{formatPoints(u.totalStake)}</td><td className={u.netProfit >= 0 ? "profit" : "loss"}>{u.netProfit > 0 ? "+" : ""}{formatPoints(u.netProfit)}</td><td>{formatTime(u.lastLoginAt)}</td></tr>)}</Table>;
+function PlayersTable({ users, onDelete }: { users: UserRow[]; onDelete: (userId: string, name: string) => void }) {
+  return <Table headers={["玩家", "邀请码", "余额", "下注", "待结算", "总投注", "净盈亏", "最后登录", "操作"]}>{users.map((u) => <tr key={u.id}><td><strong>{u.displayName}</strong></td><td>{u.inviteCode}</td><td>{formatPoints(u.balance)}</td><td>{u.totalBets}</td><td>{u.pendingBets}</td><td>{formatPoints(u.totalStake)}</td><td className={u.netProfit >= 0 ? "profit" : "loss"}>{u.netProfit > 0 ? "+" : ""}{formatPoints(u.netProfit)}</td><td>{formatTime(u.lastLoginAt)}</td><td><button className="mini-danger" onClick={() => onDelete(u.id, u.displayName)}><Trash2 size={13} /> 删除</button></td></tr>)}</Table>;
 }
 
 function BetsTable({ bets, onCancel }: { bets: BetRow[]; onCancel: (betId: string) => void }) {

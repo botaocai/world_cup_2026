@@ -34,6 +34,9 @@ if (task === "refresh-odds") {
 } else if (task === "settle-results") {
   const result = await post("/api/admin/results/settle");
   console.log(JSON.stringify({ ok: true, task, result }, null, 2));
+} else if (task === "refresh-intelligence") {
+  const result = await post("/api/admin/intelligence/refresh");
+  console.log(JSON.stringify({ ok: true, task, result }, null, 2));
 } else {
-  throw new Error("Usage: node scripts/admin-task.mjs refresh-odds|settle-results");
+  throw new Error("Usage: node scripts/admin-task.mjs refresh-odds|settle-results|refresh-intelligence");
 }

@@ -10,6 +10,7 @@
     "lint": "next lint",
     "db:seed": "node -e \"require('fs').rmSync('data/db.json',{force:true}); console.log('Seed will be recreated on next run')\"",
     "refresh:odds": "node scripts/admin-task.mjs refresh-odds",
+    "refresh:intelligence": "node scripts/admin-task.mjs refresh-intelligence",
     "settle:railway": "node scripts/admin-task.mjs settle-results",
     "settle:results": "node scripts/settle-results.mjs",
     "test:system": "node scripts/system-check.mjs",

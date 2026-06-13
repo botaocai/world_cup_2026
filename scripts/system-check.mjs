@@ -142,13 +142,15 @@ function testSyntheticLeaderboard() {
   ]
     .map((row) => ({
       name: row.displayName,
-      profit: row.bets.filter((bet) => bet.status !== "pending").reduce((sum, bet) => sum + bet.profit, 0),
+      profit: row.bets.filter((bet) => bet.status === "won" || bet.status === "lost").reduce((sum, bet) => sum + bet.profit, 0),
       pending: row.bets.filter((bet) => bet.status === "pending").length,
+      visibleBets: row.bets.filter((bet) => bet.status !== "void").length,
     }))
     .sort((a, b) => b.profit - a.profit);
 
   assert(rows.map((row) => row.name).join(",") === "Carol,Alice,Bob", "leaderboard ordering mismatch");
   assert(rows.find((row) => row.name === "Bob")?.pending === 1, "pending count mismatch");
+  assert(rows.find((row) => row.name === "Carol")?.visibleBets === 1, "void bets should be hidden from leaderboard");
 }
 
 function testOutrightLockedPrice() {

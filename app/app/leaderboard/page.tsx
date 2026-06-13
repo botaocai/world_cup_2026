@@ -1,65 +1,66 @@
-import { formatPoints } from "@/lib/format";
+import { LeaderboardDetails } from "@/components/LeaderboardDetails";
 import { getCurrentUser } from "@/lib/session";
 import { readDb } from "@/lib/store";
+import { teamZh } from "@/lib/teams";
 
 export default async function LeaderboardPage() {
   const currentUser = await getCurrentUser();
   const db = readDb();
   const rows = db.users
     .map((user) => {
-      const bets = db.bets.filter((bet) => bet.userId === user.id);
-      const settled = bets.filter((bet) => bet.status !== "pending");
+      const bets = db.bets
+        .filter((bet) => bet.userId === user.id && bet.status !== "void")
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const settled = bets.filter((bet) => bet.status === "won" || bet.status === "lost");
+      const pendingBets = bets.filter((bet) => bet.status === "pending");
       const profit = settled.reduce((sum, bet) => sum + bet.profit, 0);
       const stake = bets.reduce((sum, bet) => sum + bet.stake, 0);
       const won = settled.filter((bet) => bet.status === "won").length;
       const lost = settled.filter((bet) => bet.status === "lost").length;
-      const pending = bets.filter((bet) => bet.status === "pending").length;
 
       return {
-        user,
+        user: {
+          id: user.id,
+          displayName: user.displayName,
+          balance: user.balance,
+        },
         profit,
         stake,
         won,
         lost,
-        pending,
+        pending: pendingBets.length,
+        currentBets: pendingBets.map((bet) => betView(db, bet)),
+        historyBets: settled.map((bet) => betView(db, bet)),
       };
     })
-    .sort((a, b) => b.profit - a.profit || b.user.balance - a.user.balance);
+    .sort((a, b) => b.profit - a.profit || b.user.balance - a.user.balance)
+    .map((row, index) => ({
+      ...row,
+      rank: index + 1,
+      isCurrent: row.user.id === currentUser?.id,
+    }));
 
   return (
     <main className="content">
       <div className="section-label">排行榜</div>
-      <section className="leaderboard-panel">
-        {rows.map((row, index) => {
-          const isCurrent = row.user.id === currentUser?.id;
-          return (
-            <article
-              className={`leaderboard-row ${isCurrent ? "current" : ""}`}
-              key={row.user.id}
-            >
-              <div className={`rank-badge rank-${index + 1}`}>{index + 1}</div>
-              <div className="rank-main">
-                <div className="rank-name">
-                  <strong>{row.user.displayName}</strong>
-                  {isCurrent ? <span>我</span> : null}
-                </div>
-                <div className="rank-meta">
-                  已结算 {row.won + row.lost} 单 · 赢 {row.won} · 输 {row.lost}
-                  {row.pending ? ` · 待结算 ${row.pending}` : ""}
-                </div>
-              </div>
-              <div className="rank-score">
-                <strong className={row.profit >= 0 ? "profit" : "loss"}>
-                  {row.profit >= 0 ? "+" : ""}
-                  {formatPoints(row.profit)}
-                </strong>
-                <span>余额 {formatPoints(row.user.balance)}</span>
-              </div>
-            </article>
-          );
-        })}
-        {rows.length === 0 ? <p className="muted">还没有玩家。</p> : null}
-      </section>
+      <LeaderboardDetails rows={rows} />
     </main>
   );
+}
+
+function betView(db: ReturnType<typeof readDb>, bet: (ReturnType<typeof readDb>)["bets"][number]) {
+  const match = bet.matchId ? db.matches.find((item) => item.id === bet.matchId) : null;
+  const title = match ? `${teamZh(match.homeTeam)} vs ${teamZh(match.awayTeam)}` : bet.type === "outright" ? "冠军竞猜" : bet.selection;
+  return {
+    id: bet.id,
+    orderNo: bet.orderNo,
+    title,
+    selectionLabel: bet.selectionLabel,
+    price: bet.price,
+    stake: bet.stake,
+    possiblePayout: bet.possiblePayout,
+    status: bet.status,
+    profit: bet.profit,
+    createdAt: bet.createdAt,
+  };
 }
