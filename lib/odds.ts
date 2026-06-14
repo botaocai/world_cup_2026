@@ -78,6 +78,10 @@ function line(value: unknown) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function pruneMatchOdds(matchId: string, db: ReturnType<typeof readDb>) {
+  db.oddsSnapshots = db.oddsSnapshots.filter((odd) => odd.matchId !== matchId);
+}
+
 function pruneOldMatchOdds(matchId: string, market: string, db: ReturnType<typeof readDb>) {
   db.oddsSnapshots = db.oddsSnapshots.filter(
     (odd) => !(odd.matchId === matchId && odd.market === market),
@@ -124,6 +128,7 @@ function writeSnapshots(
   matchId: string,
   snapshots: SnapshotInput[],
 ) {
+  pruneMatchOdds(matchId, db);
   const touchedMarkets = new Set(snapshots.map((snapshot) => snapshot.market));
   for (const market of touchedMarkets) pruneOldMatchOdds(matchId, market, db);
 
