@@ -306,6 +306,93 @@ function marketSources(response: OddsApiIoResponse, names: string[]) {
     .filter((item): item is { bookmaker: string; market: OddsApiIoMarket } => Boolean(item.market));
 }
 
+type ParsedAltSpread = {
+  odd: Record<string, string | number>;
+  hdp: number;
+  home: number;
+  away: number;
+};
+
+type SpreadCandidate = {
+  odd: Record<string, string | number>;
+  line: number;
+  price: number;
+};
+
+function nearbySpreadCandidates(
+  alternatives: ParsedAltSpread[],
+  baseLine: number,
+  side: "home" | "away",
+  awayLineMode: "opposite" | "direct",
+) {
+  const candidates = alternatives
+    .map((item) => ({
+      odd: item.odd,
+      line: side === "home" ? item.hdp : awayLineMode === "opposite" ? -item.hdp : item.hdp,
+      price: side === "home" ? item.home : item.away,
+    }))
+    .filter((item) => item.line !== baseLine);
+
+  const lower = candidates
+    .filter((item) => item.line < baseLine)
+    .sort((a, b) => b.line - a.line)[0];
+  const higher = candidates
+    .filter((item) => item.line > baseLine)
+    .sort((a, b) => a.line - b.line)[0];
+
+  return [lower, higher].filter(Boolean) as SpreadCandidate[];
+}
+
+function hasSpreadPriceJump(rows: Array<{ line: number; price: number }>) {
+  const sorted = rows.slice().sort((a, b) => a.line - b.line);
+  for (let index = 1; index < sorted.length; index += 1) {
+    // For the same team, a more favorable handicap should not become materially more expensive.
+    if (sorted[index].price > sorted[index - 1].price + 0.35) return true;
+    const lineGap = Math.abs(sorted[index].line - sorted[index - 1].line);
+    if (lineGap <= 0.5 && Math.abs(sorted[index].price - sorted[index - 1].price) > 1.25) return true;
+  }
+  return false;
+}
+
+function repairSpreadCandidates(
+  candidates: SpreadCandidate[],
+  replacements: SpreadCandidate[],
+  base: { line: number; price: number },
+) {
+  if (!hasSpreadPriceJump([base, ...candidates])) return candidates;
+  return candidates.map((candidate) => {
+    if (Math.abs(candidate.price - base.price) <= 0.75) return candidate;
+    return replacements.find((item) => item.line === candidate.line) || candidate;
+  });
+}
+
+function spreadCandidateScore(candidates: SpreadCandidate[], base: { line: number; price: number }) {
+  const sorted = [base, ...candidates].slice().sort((a, b) => a.line - b.line);
+  let score = 0;
+  for (const candidate of candidates) {
+    const distance = Math.abs(candidate.line - base.line);
+    if (distance > 0.75) score += distance * 4;
+  }
+  for (let index = 1; index < sorted.length; index += 1) {
+    const lineGap = Math.abs(sorted[index].line - sorted[index - 1].line);
+    const priceDiff = sorted[index].price - sorted[index - 1].price;
+    if (priceDiff > 0.35) score += priceDiff * 10;
+    if (lineGap <= 0.5 && Math.abs(priceDiff) > 1.25) score += Math.abs(priceDiff) * 5;
+  }
+  return score;
+}
+
+function bestSpreadCandidates(
+  current: SpreadCandidate[],
+  direct: SpreadCandidate[],
+  base: { line: number; price: number },
+) {
+  const hybrid = repairSpreadCandidates(current, direct, base);
+  return [current, direct, hybrid]
+    .map((candidates) => ({ candidates, score: spreadCandidateScore(candidates, base) }))
+    .sort((a, b) => a.score - b.score || b.candidates.length - a.candidates.length)[0].candidates;
+}
+
 function oddsApiIoSnapshots(response: OddsApiIoResponse) {
   const picked = pickMarkets(response);
   if (!picked) return [];
@@ -399,30 +486,37 @@ function oddsApiIoSnapshots(response: OddsApiIoResponse) {
         return item.hdp !== undefined && Boolean(item.home) && Boolean(item.away) && item.hdp !== mainSpreadLine;
       })
       .sort((a, b) => Math.abs(a.hdp - mainSpreadLine) - Math.abs(b.hdp - mainSpreadLine));
-    const lower = alternatives
-      .filter((item) => item.hdp < mainSpreadLine)
-      .sort((a, b) => b.hdp - a.hdp)[0];
-    const higher = alternatives
-      .filter((item) => item.hdp > mainSpreadLine)
-      .sort((a, b) => a.hdp - b.hdp)[0];
+    const homeAlternatives = nearbySpreadCandidates(alternatives, mainSpreadLine, "home", "opposite");
+    const awayOppositeAlternatives = nearbySpreadCandidates(alternatives, -mainSpreadLine, "away", "opposite");
+    const awayDirectAlternatives = nearbySpreadCandidates(alternatives, -mainSpreadLine, "away", "direct");
+    const awayAlternatives = bestSpreadCandidates(
+      awayOppositeAlternatives,
+      awayDirectAlternatives,
+      { line: -mainSpreadLine, price: spreadAway as number },
+    );
 
-    for (const item of [lower, higher].filter(Boolean)) {
+    for (const item of homeAlternatives) {
       snapshots.push(
         {
           market: "spreads",
           selection: "home",
-          label: `${teamZh(response.home)} ${formatAsianLine(item.hdp)}`.trim(),
-          line: item.hdp,
-          price: item.home,
+          label: `${teamZh(response.home)} ${formatAsianLine(item.line)}`.trim(),
+          line: item.line,
+          price: item.price,
           bookmaker: altSpreadSource.bookmaker,
           sourcePayload: sourcePayload(altSpreadSource.market.name, item.odd),
         },
+      );
+    }
+
+    for (const item of awayAlternatives) {
+      snapshots.push(
         {
           market: "spreads",
           selection: "away",
-          label: `${teamZh(response.away)} ${formatAsianLine(-item.hdp)}`.trim(),
-          line: -item.hdp,
-          price: item.away,
+          label: `${teamZh(response.away)} ${formatAsianLine(item.line)}`.trim(),
+          line: item.line,
+          price: item.price,
           bookmaker: altSpreadSource.bookmaker,
           sourcePayload: sourcePayload(altSpreadSource.market.name, item.odd),
         },
