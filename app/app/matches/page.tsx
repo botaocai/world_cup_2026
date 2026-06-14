@@ -43,6 +43,18 @@ function marketOrder(odds: PageOdd[], selections: string[]) {
   return odds.sort((a, b) => selections.indexOf(a.selection) - selections.indexOf(b.selection));
 }
 
+function saneExtraSpreads(extraSpreads: PageOdd[], mainSpreads: PageOdd[]) {
+  const mainBySelection = new Map(mainSpreads.map((odd) => [odd.selection, odd]));
+  return extraSpreads.filter((odd) => {
+    const main = mainBySelection.get(odd.selection);
+    if (!main || odd.line === undefined || main.line === undefined) return true;
+    const priceGap = odd.price - main.price;
+    if (odd.line < main.line) return priceGap <= 0.75;
+    if (odd.line > main.line) return priceGap <= 0.35;
+    return true;
+  });
+}
+
 function oddsBoost(price: number) {
   if (!Number.isFinite(price) || price <= 1) return 1;
   return Math.min(2.5, 1 + Math.log(price) / 2);
@@ -155,7 +167,10 @@ export default async function MatchesPage() {
           odds.filter((odd) => odd.market === "totals" && !isAltMarket(odd)),
           ["over", "under"],
         );
-        const extraSpreads = odds.filter((odd) => odd.market === "spreads" && isAltMarket(odd));
+        const extraSpreads = saneExtraSpreads(
+          odds.filter((odd) => odd.market === "spreads" && isAltMarket(odd)),
+          spreads,
+        );
         const extraTotals = odds.filter((odd) => odd.market === "totals" && isAltMarket(odd));
         const h2h = marketOrder(
           odds.filter((odd) => odd.market === "h2h"),

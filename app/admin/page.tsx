@@ -110,6 +110,13 @@ export default function AdminPage() {
       const data = await request("/api/odds/refresh", { method: "POST" });
       setMessage(`赛事赔率刷新完成：${data.matches?.count ?? 0} 场；冠军赔率接口状态：${data.outrights?.skipped ? "未获取" : "已获取"}`);
       await loadDashboard();
+      const fallback = data.matches?.fallbackFrom
+        ? `；fallback：${data.matches.fallbackFrom.source || "-"} ${data.matches.fallbackFrom.reason || ""}`
+        : "";
+      const outrightStatus = data.outrights?.skipped
+        ? `冠军未获取：${data.outrights?.reason || "-"}`
+        : "冠军已获取";
+      setMessage(`刷新赔率完成：${data.matches?.source || "-"}，${data.matches?.count ?? 0} 场${fallback}；${outrightStatus}`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "刷新失败");
     } finally {
