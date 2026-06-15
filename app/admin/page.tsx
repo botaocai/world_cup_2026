@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, Bot, Coins, Download, RefreshCw, Search, TicketPlus, Trash2 } from "lucide-react";
+import { Ban, Bot, Coins, Download, Pencil, RefreshCw, Search, TicketPlus, Trash2 } from "lucide-react";
 
 type UserRow = { id: string; displayName: string; balance: number; inviteCode: string; lastLoginAt: string; totalBets: number; pendingBets: number; totalStake: number; netProfit: number };
 type BetRow = { id: string; orderNo: string; userName: string; matchTitle: string; score: string; selectionLabel: string; price: number; stake: number; status: string; profit: number; createdAt: string };
@@ -27,7 +27,7 @@ type Dashboard = {
 };
 
 const statusText: Record<string, string> = { pending: "待结算", won: "已赢", lost: "已输", void: "已退回" };
-const txText: Record<string, string> = { initial_grant: "初始积分", bet_stake: "下注扣款", bet_settlement: "派奖结算", admin_adjustment: "后台调整", admin_cancel_bet: "取消退回", outright_settlement: "冠军结算", admin_reset_balance: "余额重置" };
+const txText: Record<string, string> = { initial_grant: "初始积分", bet_stake: "下注扣款", bet_settlement: "派奖结算", admin_adjustment: "后台调整", admin_cancel_bet: "取消退回", admin_edit_bet_price: "修改赔率", outright_settlement: "冠军结算", admin_reset_balance: "余额重置" };
 
 function formatPoints(value: number) {
   return new Intl.NumberFormat("zh-CN").format(value);
@@ -307,6 +307,26 @@ export default function AdminPage() {
     }
   }
 
+  async function editBetPrice(bet: BetRow) {
+    const value = window.prompt(`修改订单 ${bet.orderNo} 的赔率`, bet.price.toFixed(2));
+    if (value === null) return;
+    const price = Number(value);
+    if (!Number.isFinite(price) || price <= 1) {
+      setMessage("赔率必须大于 1");
+      return;
+    }
+    setLoading(true);
+    try {
+      await request("/api/admin/bets/price", { method: "POST", body: JSON.stringify({ betId: bet.id, price }) });
+      setMessage(`订单 ${bet.orderNo} 赔率已修改为 ${price.toFixed(2)}`);
+      await loadDashboard();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "修改赔率失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function deleteUser(userId: string, name: string) {
     if (!window.confirm(`确定删除玩家「${name}」吗？这会删除他的账号、下注记录和资金流水，并禁用对应邀请码。`)) return;
     setLoading(true);
@@ -495,7 +515,7 @@ export default function AdminPage() {
             ) : null}
 
             {active === "players" ? <PlayersTable users={dashboard.users} onDelete={deleteUser} /> : null}
-            {active === "bets" ? <BetsTable bets={filteredBets} onCancel={cancelBet} /> : null}
+            {active === "bets" ? <BetsTable bets={filteredBets} onCancel={cancelBet} onEditPrice={editBetPrice} /> : null}
             {active === "settlements" ? <TransactionsTable transactions={filteredTransactions} /> : null}
             {active === "results" ? <ResultsPanel matches={dashboard.matches} matchId={resultMatchId} setMatchId={setResultMatchId} homeScore={homeScore} setHomeScore={setHomeScore} awayScore={awayScore} setAwayScore={setAwayScore} onSave={updateMatchResult} /> : null}
             {active === "invites" ? <InvitesTable invites={dashboard.invites} onSaveNote={saveInviteNote} /> : null}
@@ -546,8 +566,8 @@ function PlayersTable({ users, onDelete }: { users: UserRow[]; onDelete: (userId
   return <Table headers={["玩家", "邀请码", "余额", "下注", "待结算", "总投注", "净盈亏", "最后登录", "操作"]}>{users.map((u) => <tr key={u.id}><td><strong>{u.displayName}</strong></td><td>{u.inviteCode}</td><td>{formatPoints(u.balance)}</td><td>{u.totalBets}</td><td>{u.pendingBets}</td><td>{formatPoints(u.totalStake)}</td><td className={u.netProfit >= 0 ? "profit" : "loss"}>{u.netProfit > 0 ? "+" : ""}{formatPoints(u.netProfit)}</td><td>{formatTime(u.lastLoginAt)}</td><td><button className="mini-danger" onClick={() => onDelete(u.id, u.displayName)}><Trash2 size={13} /> 删除</button></td></tr>)}</Table>;
 }
 
-function BetsTable({ bets, onCancel }: { bets: BetRow[]; onCancel: (betId: string) => void }) {
-  return <Table headers={["订单", "玩家", "比赛", "投注项", "金额", "赔率", "状态", "盈亏", "时间", "操作"]}>{bets.map((b) => <tr key={b.id}><td>{b.orderNo}</td><td>{b.userName}</td><td>{b.matchTitle}{b.score ? <span className="admin-score"> {b.score}</span> : null}</td><td>{b.selectionLabel}</td><td>{formatPoints(b.stake)}</td><td>{b.price.toFixed(2)}</td><td>{statusText[b.status] || b.status}</td><td className={b.profit >= 0 ? "profit" : "loss"}>{b.status === "pending" ? "-" : `${b.profit > 0 ? "+" : ""}${formatPoints(b.profit)}`}</td><td>{formatTime(b.createdAt)}</td><td>{b.status === "pending" ? <button className="mini-danger" onClick={() => onCancel(b.id)}><Ban size={13} /> 取消</button> : "-"}</td></tr>)}</Table>;
+function BetsTable({ bets, onCancel, onEditPrice }: { bets: BetRow[]; onCancel: (betId: string) => void; onEditPrice: (bet: BetRow) => void }) {
+  return <Table headers={["订单", "玩家", "比赛", "投注项", "金额", "赔率", "状态", "盈亏", "时间", "操作"]}>{bets.map((b) => <tr key={b.id}><td>{b.orderNo}</td><td>{b.userName}</td><td>{b.matchTitle}{b.score ? <span className="admin-score"> {b.score}</span> : null}</td><td>{b.selectionLabel}</td><td>{formatPoints(b.stake)}</td><td>{b.price.toFixed(2)}</td><td>{statusText[b.status] || b.status}</td><td className={b.profit >= 0 ? "profit" : "loss"}>{b.status === "pending" ? "-" : `${b.profit > 0 ? "+" : ""}${formatPoints(b.profit)}`}</td><td>{formatTime(b.createdAt)}</td><td>{b.status === "pending" ? <div className="admin-row-actions"><button className="mini-button" onClick={() => onEditPrice(b)}><Pencil size={13} /> 改赔率</button><button className="mini-danger" onClick={() => onCancel(b.id)}><Ban size={13} /> 取消</button></div> : "-"}</td></tr>)}</Table>;
 }
 
 function TransactionsTable({ transactions }: { transactions: TransactionRow[] }) {

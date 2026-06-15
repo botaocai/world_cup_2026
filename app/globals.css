@@ -1838,7 +1838,17 @@ a {
   padding: 6px 8px;
   background: #eee9e2;
   color: var(--brand);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-weight: 800;
+}
+
+.admin-row-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .outright-form {
