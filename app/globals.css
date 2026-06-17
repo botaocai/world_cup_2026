@@ -844,6 +844,21 @@ a {
   color: var(--muted);
 }
 
+.bet-success-card {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 16px;
+  padding: 12px;
+  background: #f6f3ee;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.bet-success-card > strong {
+  color: var(--text);
+  line-height: 1.35;
+}
+
 .record-header {
   background: var(--brand);
   color: #fff;

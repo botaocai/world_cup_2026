@@ -11,6 +11,14 @@ type Selection = {
   price: number;
 };
 
+type BetResult = {
+  orderNo: string;
+  selectionLabel: string;
+  stake: number;
+  price: number;
+  possiblePayout: number;
+};
+
 export function BetButton({ selection, compact = false }: { selection: Selection; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
@@ -53,6 +61,7 @@ function BetSheet({
   const router = useRouter();
   const [stake, setStake] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState<BetResult | null>(null);
   const [loading, setLoading] = useState(false);
   const stakeAmount = Number(stake);
   const canSubmit = Number.isFinite(stakeAmount) && stakeAmount > 0;
@@ -89,15 +98,39 @@ function BetSheet({
       return;
     }
 
+    setSuccess(data.bet);
     window.dispatchEvent(new Event("worldcup:refresh-user"));
-    onClose();
-    router.push("/app/bets");
     router.refresh();
   }
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="bet-sheet" onClick={(event) => event.stopPropagation()}>
+        {success ? (
+          <>
+            <h3>下注成功</h3>
+            <div className="bet-success-card">
+              <div className="muted">订单号 {success.orderNo}</div>
+              <strong>{success.selectionLabel}</strong>
+              <div className="sheet-row">
+                <span>下注金额</span>
+                <strong>{success.stake}</strong>
+              </div>
+              <div className="sheet-row">
+                <span>赔率</span>
+                <strong>{success.price.toFixed(2)}</strong>
+              </div>
+              <div className="sheet-row">
+                <span>预计返还</span>
+                <strong>{success.possiblePayout}</strong>
+              </div>
+            </div>
+            <button className="button" onClick={onClose}>
+              继续下注
+            </button>
+          </>
+        ) : (
+          <>
         <h3>确认投注</h3>
         {selection.context ? <div className="muted">{selection.context}</div> : null}
         <div className="muted">{selection.label}</div>
@@ -127,6 +160,8 @@ function BetSheet({
             {loading ? "提交中..." : "确认"}
           </button>
         </div>
+          </>
+        )}
       </div>
     </div>
   );
