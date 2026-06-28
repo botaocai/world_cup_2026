@@ -354,6 +354,7 @@ function hasSpreadPriceJump(rows: Array<{ line: number; price: number }>) {
     // For the same team, a more favorable handicap should not become materially more expensive.
     if (sorted[index].price > sorted[index - 1].price + 0.35) return true;
     const lineGap = Math.abs(sorted[index].line - sorted[index - 1].line);
+    if (lineGap <= 0.5 && Math.abs(sorted[index].price - sorted[index - 1].price) > 0.6) return true;
     if (lineGap <= 0.5 && Math.abs(sorted[index].price - sorted[index - 1].price) > 1.25) return true;
   }
   return false;
@@ -366,7 +367,7 @@ function repairSpreadCandidates(
 ) {
   if (!hasSpreadPriceJump([base, ...candidates])) return candidates;
   return candidates.map((candidate) => {
-    if (Math.abs(candidate.price - base.price) <= 0.75) return candidate;
+    if (Math.abs(candidate.price - base.price) <= 0.45) return candidate;
     return replacements.find((item) => item.line === candidate.line) || candidate;
   });
 }
@@ -382,6 +383,7 @@ function spreadCandidateScore(candidates: SpreadCandidate[], base: { line: numbe
     const lineGap = Math.abs(sorted[index].line - sorted[index - 1].line);
     const priceDiff = sorted[index].price - sorted[index - 1].price;
     if (priceDiff > 0.35) score += priceDiff * 10;
+    if (lineGap <= 0.5 && Math.abs(priceDiff) > 0.6) score += Math.abs(priceDiff) * 8;
     if (lineGap <= 0.5 && Math.abs(priceDiff) > 1.25) score += Math.abs(priceDiff) * 5;
   }
   return score;

@@ -48,6 +48,8 @@ function saneExtraSpreads(extraSpreads: PageOdd[], mainSpreads: PageOdd[]) {
   return extraSpreads.filter((odd) => {
     const main = mainBySelection.get(odd.selection);
     if (!main || odd.line === undefined || main.line === undefined) return true;
+    const lineGap = Math.abs(odd.line - main.line);
+    if (lineGap <= 0.5 && Math.abs(odd.price - main.price) > 0.6) return false;
     const priceGap = odd.price - main.price;
     if (odd.line < main.line) return priceGap <= 0.75;
     if (odd.line > main.line) return priceGap <= 0.35;
