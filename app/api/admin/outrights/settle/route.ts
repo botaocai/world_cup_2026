@@ -10,8 +10,16 @@ function isAdmin(request: Request) {
 }
 
 const schema = z.object({
-  champion: z.string().trim().min(1).max(40),
+  mode: z.enum(["champion", "eliminated"]).default("champion"),
+  champion: z.string().trim().min(1).max(40).optional(),
+  outrightId: z.string().trim().min(1).optional(),
 });
+
+function settleLostOutrightBet(bet: { status: "pending" | "won" | "lost" | "void"; profit: number; stake: number; settledAt?: string }, settledAt: string) {
+  bet.status = "lost";
+  bet.profit = -bet.stake;
+  bet.settledAt = settledAt;
+}
 
 export async function POST(request: Request) {
   if (!isAdmin(request)) {
@@ -23,10 +31,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "请输入冠军队名" }, { status: 400 });
   }
 
-  const champion = teamZh(parsed.data.champion);
   const db = readDb();
   const settledAt = timestamp();
   const settled = [];
+
+  if (parsed.data.mode === "eliminated") {
+    if (!parsed.data.outrightId) {
+      return NextResponse.json({ error: "请选择要淘汰结算的球队" }, { status: 400 });
+    }
+
+    const odd = db.outrightOdds.find((item) => item.id === parsed.data.outrightId);
+    if (!odd) {
+      return NextResponse.json({ error: "未找到这条冠军赔率" }, { status: 404 });
+    }
+
+    const eliminatedTeam = teamZh(odd.teamName);
+    for (const bet of db.bets.filter(
+      (item) =>
+        item.type === "outright" &&
+        item.status === "pending" &&
+        (item.outrightOddsId === odd.id || teamZh(item.selection) === eliminatedTeam),
+    )) {
+      settleLostOutrightBet(bet, settledAt);
+      settled.push({
+        orderNo: bet.orderNo,
+        selection: bet.selection,
+        lockedPrice: bet.price,
+        stake: bet.stake,
+        payout: 0,
+        profit: bet.profit,
+        status: bet.status,
+      });
+    }
+
+    writeDb(db);
+    return NextResponse.json({ ok: true, mode: "eliminated", team: eliminatedTeam, settled });
+  }
+
+  if (!parsed.data.champion) {
+    return NextResponse.json({ error: "请输入冠军队名" }, { status: 400 });
+  }
+
+  const champion = teamZh(parsed.data.champion);
 
   for (const bet of db.bets.filter(
     (item) => item.type === "outright" && item.status === "pending",
@@ -36,9 +82,13 @@ export async function POST(request: Request) {
 
     const won = bet.selection === champion;
     const payout = won ? bet.possiblePayout : 0;
-    bet.status = won ? "won" : "lost";
-    bet.profit = payout - bet.stake;
-    bet.settledAt = settledAt;
+    if (won) {
+      bet.status = "won";
+      bet.profit = payout - bet.stake;
+      bet.settledAt = settledAt;
+    } else {
+      settleLostOutrightBet(bet, settledAt);
+    }
 
     if (payout > 0) {
       user.balance += payout;

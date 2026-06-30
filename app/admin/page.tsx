@@ -394,6 +394,24 @@ export default function AdminPage() {
     }
   }
 
+  async function settleEliminatedOutright(odd: OutrightRow) {
+    if (!window.confirm(`确定将“${odd.teamName}”按已淘汰结算为输吗？该队所有待结算冠军单都会判负，已扣除的本金不会退回。`)) return;
+    setLoading(true);
+    try {
+      const data = await request("/api/admin/outrights/settle", {
+        method: "POST",
+        body: JSON.stringify({ mode: "eliminated", outrightId: odd.id }),
+      });
+      setMessage(`已淘汰结算 ${data.team || odd.teamName}：${data.settled.length} 单判负`);
+      await loadDashboard();
+      setActive("outrights");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "淘汰结算失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function exportData(type: "players" | "bets" | "transactions" | "json") {
     if (!password) return setMessage("请先输入管理员密码");
     setLoading(true);
@@ -532,6 +550,7 @@ export default function AdminPage() {
                 setPrice={setOutrightPrice}
                 onSave={saveOutright}
                 onDelete={deleteOutright}
+                onEliminate={settleEliminatedOutright}
                 championName={championName}
                 setChampionName={setChampionName}
                 onSettleChampion={settleChampion}
@@ -638,6 +657,7 @@ function OutrightsPanel(props: {
   setPrice: (value: string) => void;
   onSave: () => void;
   onDelete: (id: string) => void;
+  onEliminate: (odd: OutrightRow) => void;
   championName: string;
   setChampionName: (value: string) => void;
   onSettleChampion: () => void;
@@ -658,7 +678,7 @@ function OutrightsPanel(props: {
       </div>
       {props.editingId ? <button className="button secondary admin-clear-button" onClick={props.onClear}>取消编辑</button> : null}
       <Table headers={["国家", "赔率", "来源", "待结算投注", "更新时间", "操作"]}>
-        {props.outrights.map((odd) => <tr key={odd.id}><td><strong>{odd.flag || ""} {odd.teamName}</strong></td><td>{odd.price.toFixed(2)}</td><td>{odd.bookmaker}</td><td>{odd.pendingBets}</td><td>{formatTime(odd.fetchedAt)}</td><td><button className="mini-button" onClick={() => props.onEdit(odd)}>编辑</button> <button className="mini-danger" onClick={() => props.onDelete(odd.id)}><Trash2 size={13} /> 删除</button></td></tr>)}
+        {props.outrights.map((odd) => <tr key={odd.id}><td><strong>{odd.flag || ""} {odd.teamName}</strong></td><td>{odd.price.toFixed(2)}</td><td>{odd.bookmaker}</td><td>{odd.pendingBets}</td><td>{formatTime(odd.fetchedAt)}</td><td><div className="admin-row-actions"><button className="mini-button" onClick={() => props.onEdit(odd)}>编辑</button><button className="mini-danger" onClick={() => props.onEliminate(odd)}>淘汰结算</button><button className="mini-danger" onClick={() => props.onDelete(odd.id)}><Trash2 size={13} /> 删除</button></div></td></tr>)}
       </Table>
     </>
   );
